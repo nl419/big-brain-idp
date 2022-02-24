@@ -11,7 +11,7 @@ if __name__ == '__main__' :
     # Instead of CSRT, you can also use
  
     tracker_types = ['KCF', 'CSRT']
-    tracker_index = 1
+    tracker_index = 0
 
     tracker_type = tracker_types[tracker_index]
     tracker_funcs = [cv2.TrackerKCF_create, cv2.TrackerCSRT_create]
