@@ -5,7 +5,8 @@ import os
 import glob
 import imutils
 
-CHECKERBOARD = (7,10)
+CHECKERBOARD = (6,9)
+RESOLUTION = np.array([1806, 1440]) // 2
 subpix_criteria = (cv2.TERM_CRITERIA_EPS+cv2.TERM_CRITERIA_MAX_ITER, 30, 0.1)
 calibration_flags = cv2.fisheye.CALIB_RECOMPUTE_EXTRINSIC+cv2.fisheye.CALIB_FIX_SKEW
 objp = np.zeros((1, CHECKERBOARD[0]*CHECKERBOARD[1], 3), np.float32)
@@ -19,6 +20,7 @@ def load_images_from_folder(folder):
     for filename in os.listdir(folder):
         img = cv2.imread(os.path.join(folder,filename))
         if img is not None:
+            img = cv2.resize(img, RESOLUTION.tolist())
             images.append(img)
     return images
 
