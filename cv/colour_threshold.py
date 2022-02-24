@@ -9,7 +9,7 @@ def nothing(x):
     pass
 
 # Load in image
-image = cv2.imread('2.jpg')
+image = cv2.imread('cv/2.jpg')
 
 # Create a window
 cv2.namedWindow('image')

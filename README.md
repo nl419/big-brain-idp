@@ -4,7 +4,8 @@ BIG BRAINS ONLY
 PLEASE LEAVE IF YOUR BRAIN SMOL
 
 ## Installation instructions
-- `pip install opencv-python imutils`
+- `pip uninstall opencv-python`
+- `pip install opencv-contrib-python imutils`
 - Open a VS Code Window
 - Open the command palette: View -> Command Palette... (Ctrl+Shift+P)
 - Start typing "git clone" and click on "Git: Clone"

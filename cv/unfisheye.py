@@ -23,6 +23,6 @@ def undistort(img):
         cv2.destroyAllWindows()
     return undistorted_img
 if debug:
-    img = cv2.imread('1.jpg')
+    img = cv2.imread('cv/1.jpg')
     undistort(img)
 
