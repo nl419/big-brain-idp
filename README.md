@@ -1,7 +1,7 @@
 # big-brain-idp
 BIG BRAINS ONLY
 
-PLEASE LEAVE IF YOUR BRAIN SMOL
+PLEASE LEAVE IF YOUR BRAIN SMOL OR PP
 
 ## Installation instructions
 - `pip uninstall opencv-python`
