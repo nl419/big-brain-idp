@@ -2,10 +2,13 @@
 
 from __future__ import print_function
 import cv2 as cv
+import numpy as np
 
 video_file = "test_vids/input.mp4"
 algos = ['MOG2', 'KNN']
 algo_index = 0
+
+denoising_type = 0  # 1 is very, very slow.
 
 if algo_index == 0:
     backSub = cv.createBackgroundSubtractorMOG2()
@@ -20,6 +23,17 @@ while True:
     if frame is None:
         break
     
+    # Denoising attempt 1
+    if denoising_type == 0:
+        N = 10
+        its = 5
+        kernel = np.ones((N,N),np.uint8)
+        frame = cv.morphologyEx(frame, cv.MORPH_OPEN, kernel, iterations=its)
+
+    # Denoising attempt 2
+    else:
+        frame = cv.fastNlMeansDenoisingColored(frame, None, 2, 2, 7, 21)
+
     fgMask = backSub.apply(frame)
     
     
