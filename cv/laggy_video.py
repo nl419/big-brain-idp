@@ -1,5 +1,7 @@
 import cv2, queue, threading, time
 
+# Credit: https://stackoverflow.com/questions/43665208/how-to-get-the-latest-frame-from-capture-device-camera-in-opencv
+
 # bufferless VideoCapture
 class VideoCapture:
 

@@ -4,6 +4,9 @@ import cv2
 import sys
 
 (major_ver, minor_ver, subminor_ver) = (cv2.__version__).split('.')
+
+video_file = 'http://localhost:8081/stream/video.mjpeg'
+# video_file = 'test_vids/input.mp4'
  
 if __name__ == '__main__' :
  
@@ -20,7 +23,7 @@ if __name__ == '__main__' :
     print("Selected tracker type", tracker_type)
 
     # Read video
-    video = cv2.VideoCapture("test_vids/input.mp4")
+    video = cv2.VideoCapture(video_file)
     #video = cv2.VideoCapture(0) # for using CAM
 
     # Exit if video not opened.
