@@ -6,7 +6,7 @@ folder = "checkerboard2"
 
 print ("starting grab")
 cap = cv2.VideoCapture('http://localhost:8081/stream/video.mjpeg')
-counter = 1
+counter = 26
 while True:
     ret, frame = cap.read()
     cv2.imshow('Video', frame)
