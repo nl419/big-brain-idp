@@ -82,7 +82,7 @@ def drawMarkers(im: list, points: "list[int]", lineColour: "list[int]"):
     lineColour : list[int]
         Colour (B,G,R) of lines joining the vertices
     """
-    x = bbox[0].astype(int)
+    x = points.astype(int)
     n = len(x)
     for j in range(n):
         p1 = tuple(x[j])
