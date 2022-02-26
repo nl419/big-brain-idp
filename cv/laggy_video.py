@@ -4,7 +4,7 @@ import cv2, queue, threading, time
 
 # bufferless VideoCapture
 class VideoCapture:
-
+  """Removes buffering from VideoCapture, so the latest frame is always grabbed"""
   def __init__(self, name):
     self.cap = cv2.VideoCapture(name)
     self.q = queue.Queue()
@@ -28,10 +28,11 @@ class VideoCapture:
   def read(self):
     return self.q.get()
 
-cap = VideoCapture('http://localhost:8081/stream/video.mjpeg')
-while True:
-  time.sleep(.5)   # simulate time between events
-  frame = cap.read()
-  cv2.imshow("frame", frame)
-  if chr(cv2.waitKey(1)&255) == 'q':
-    break
+if __name__ == "__main__":
+  cap = VideoCapture('http://localhost:8081/stream/video.mjpeg')
+  while True:
+    time.sleep(.5)   # simulate time between events
+    frame = cap.read()
+    cv2.imshow("frame", frame)
+    if chr(cv2.waitKey(1)&255) == 'q':
+      break
