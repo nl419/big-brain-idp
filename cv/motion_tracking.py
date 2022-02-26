@@ -9,10 +9,6 @@ video_file = 'http://localhost:8081/stream/video.mjpeg'
 # video_file = 'test_vids/input.mp4'
  
 if __name__ == '__main__' :
- 
-    # Set up tracker.
-    # Instead of CSRT, you can also use
- 
     tracker_types = ['KCF', 'CSRT']
     tracker_index = 0
 
