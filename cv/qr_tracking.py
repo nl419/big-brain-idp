@@ -1,4 +1,16 @@
-"""Fast tracking of a QR code in a video with the use of cropping"""
+"""Fast tracking of a QR code in a video with the use of cropping.
+
+Rough explanation
+-----------------
+
+- Read video frame
+- Estimate new position of QR code
+- Search for QR code near this position
+- If QR code found,
+    - update position estimate for next frame
+- If no QR code found for more than 5x in a row,
+    - search entire image for QR code
+"""
 
 import cv2
 import sys
@@ -29,7 +41,7 @@ if __name__ == '__main__':
     else:
         lastCentre = np.zeros(2).astype(int)
         track_timeout = 5  # How many frames of consecutive tracking failure before resetting lastCentre
-        track_fail_count = track_timeout
+        track_fail_count = track_timeout # Always reset on first frame
 
     # Read video
     video = cv2.VideoCapture(video_file)
@@ -63,7 +75,7 @@ if __name__ == '__main__':
 
         transform = [0,0] # Transformation from cropped coords to real coords
         if USE_CROP:
-            if TRACKER:
+            if TRACKER: # ROI tracker
                 ok, roi = tracker.update(frame)
 
                 # Draw bounding box
@@ -78,22 +90,26 @@ if __name__ == '__main__':
                     # Tracking failure
                     cv2.putText(frame, "Tracking failure detected", (100, 80),
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0, 0, 255), 2)
-            else:
+            else: # QR code tracker
                 if track_fail_count < track_timeout:
                     qrframe = frame[lastCentre[1] - CROP_RADIUS:lastCentre[1] + CROP_RADIUS,
                                     lastCentre[0] - CROP_RADIUS:lastCentre[0] + CROP_RADIUS]
                     transform = [lastCentre[0] - CROP_RADIUS, lastCentre[1] - CROP_RADIUS]
                 else:
                     qrframe = frame
+            # Search for QR code in (potentially cropped) frame
             found, bbox = qrDecoder.detect(qrframe)
-        else:
+        else: # USE_CROP = false
             found, bbox = qrDecoder.detect(frame)
 
         if found:
             bbox = bbox[0]  # bbox is always a unit length list, so just grab the first element
+            # now bbox is a list of 4 vertices relative to cropped coords, so transform them
             for i in range(len(bbox)):
                 bbox[i,0] += transform[0]
                 bbox[i,1] += transform[1]
+            
+            # check validity
             shape_data = getQRShape(bbox)
             isValid = shape_data[0] < 300**2 and shape_data[0] > 60**2 and shape_data[1] > 0.98
             # text_data = getQRData(frame, bbox, qrDecoder)
@@ -101,13 +117,16 @@ if __name__ == '__main__':
 
             # Draw blue border if valid, green otherwise.
             drawMarkers(frame, bbox, (255, 0, 0) if isValid else (0, 255, 0))
-            if not TRACKER:
+
+            # update position estimate and failure counter
+            if USE_CROP:
                 if isValid:
-                    lastCentre = np.mean(bbox, axis=0).astype(int)
+                    if not TRACKER:
+                        lastCentre = np.mean(bbox, axis=0).astype(int)
                     track_fail_count = 0
                 else:
                     track_fail_count += 1
-        else:
+        else: # not found
             cv2.putText(frame, "QR code not detected", (100, 150),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0, 0, 255), 2)
             track_fail_count += 1
@@ -128,7 +147,6 @@ if __name__ == '__main__':
         # cv2.imshow("Tracking", qrframe)
 
         # Exit if ESC pressed
-        # cv2.waitKey(0)
         if cv2.waitKey(1) & 0xFF == ord('q'):  # if press SPACE bar
             break
 
