@@ -16,9 +16,6 @@ import cv2
 import sys
 from find_qr import *
 
-# Credit: https://learnopencv.com/opencv-qr-code-scanner-c-and-python/
-# Generate QR codes with https://barcode.tec-it.com/en/QRCode
-
 video_file = 'test_vids/qr2.mp4'
 DIM = (np.array((1920, 1080))).astype(int)
 USE_CROP = True # Whether to crop image around an estimated QR code area
