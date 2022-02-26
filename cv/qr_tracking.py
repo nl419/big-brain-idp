@@ -11,9 +11,12 @@ from find_qr import *
 # If tracking lost for 5 frames in a row, go to step 1
 
 video_file = 'test_vids/qr2.mp4'
+RESOLUTION = (np.array((1920, 1080)) / 2).astype(int)
 TRACKER = False  # Whether to use an ROI tracking method
 
 if __name__ == '__main__':
+    cv2.namedWindow("Tracking", cv2.WINDOW_NORMAL)
+    cv2.resizeWindow("Tracking", RESOLUTION[0], RESOLUTION[1])
     if TRACKER:
         tracker_types = ['KCF', 'CSRT']
         tracker_index = 1
@@ -45,7 +48,7 @@ if __name__ == '__main__':
     qrDecoder = cv2.QRCodeDetector()
 
     if TRACKER:
-        roi = cv2.selectROI(frame, False)
+        roi = cv2.selectROI("Tracking", frame, False)
         # Initialize tracker with first frame and bounding box
         ok = tracker.init(frame, roi)
 
@@ -110,7 +113,7 @@ if __name__ == '__main__':
         cv2.putText(frame, "FPS : " + str(int(fps)), (100, 50),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.75, (50, 170, 50), 2)
         # Display result
-        cv2.imshow("Tracking", b_mask)
+        cv2.imshow("Tracking", frame)
 
         # Exit if ESC pressed
         # cv2.waitKey(0)
