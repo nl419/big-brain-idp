@@ -1,3 +1,5 @@
+"""Benchmark the time taken to find a QR code"""
+
 from timeit import timeit
 
 # Generate QR codes with https://barcode.tec-it.com/en/QRCode

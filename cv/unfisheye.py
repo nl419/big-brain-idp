@@ -1,8 +1,7 @@
-# You should replace these 3 lines with the output in calibration step
+"""Remove fisheye effects from a single image, given the calibration coefficients found in calibrate.py"""
+
 import numpy as np
 import cv2
-import sys
-import imutils
 
 # MAC checkerboard
 # DIM=(1806, 1440)
@@ -24,7 +23,21 @@ pic_name = "cv/1.jpg"
 
 debug = __name__ == "__main__"
 
-def undistort(img):
+def undistort(img: np.ndarray) -> np.ndarray:
+    """Returns the image without fisheye distortion.
+
+    Uses calibration coefficients found using calibrate.py with checkerboards
+
+    Parameters
+    ----------
+    img : np.ndarray
+        The image with distortion
+
+    Returns
+    -------
+    undistorted_img : np.ndarray
+        The image without distortion
+    """
     img = cv2.resize(img, DIM)
     if debug:
         cv2.namedWindow("input", cv2.WINDOW_NORMAL)

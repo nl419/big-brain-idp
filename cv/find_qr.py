@@ -1,14 +1,17 @@
+"""Utility functions for finding QR codes"""
+
 import cv2
 import numpy as np
 
-# Generate QR codes with https://barcode.tec-it.com/en/QRCode
+# Generate QR codes with https://barcode.tec-it.com/en/QRCode,
+# or with the extension in InkScape (Extensions > Render > Barcode > QR Code...)
 
 DECODE = False  # Whether to additionally decode the QR code
 img = cv2.imread("qr_codes/small/rotated.png")
 # img = cv2.imread("qr_codes/small/original.png")
 
 
-def getQRData(img: list, bbox: list, decoder: cv2.QRCodeDetector) -> str or None:
+def getQRData(img: np.ndarray, bbox: list, decoder: cv2.QRCodeDetector) -> str or None:
     """Return the data within a QR code, if valid.
 
     This function can be used to check that the correct QR code was found, although
@@ -19,8 +22,8 @@ def getQRData(img: list, bbox: list, decoder: cv2.QRCodeDetector) -> str or None
 
     Args
     -------
-    img : list
-        The image in list / NumPy array form
+    img : np.ndarray
+        The image in NumPy array form
     bbox : list
         A list of four pairs of (x,y) coordinates of the corners of the QR code
     decoder : cv2.QRCodeDetector
@@ -69,13 +72,13 @@ def getQRShape(points: list):
     return area, minDotp
 
 
-def drawMarkers(im: list, points: "list[int]", lineColour: "list[int]"):
+def drawMarkers(img: np.ndarray, points: "list[int]", lineColour: "list[int]"):
     """Draws markers on the image for a QR code bounding box.
     Also draws the forward-facing line
 
     Parameters
     ----------
-    im : list
+    img : np.ndarray
         The image to draw onto
     points : list[int]
         List of (x,y) coordinates of the bounding box vertices
@@ -87,16 +90,16 @@ def drawMarkers(im: list, points: "list[int]", lineColour: "list[int]"):
     for j in range(n):
         p1 = tuple(x[j])
         p2 = tuple(x[(j+1) % n])
-        cv2.line(im, p1, p2, lineColour, 3)
+        cv2.line(img, p1, p2, lineColour, 3)
 
     centre = np.mean(x, axis=0).astype(int)
     top_midpoint = np.mean(x[0:2], axis=0).astype(int)
     marker_radius = 5
-    cv2.circle(im, centre, radius=marker_radius,
+    cv2.circle(img, centre, radius=marker_radius,
                color=(0, 0, 255), thickness=-1)
-    cv2.circle(im, top_midpoint, radius=marker_radius,
+    cv2.circle(img, top_midpoint, radius=marker_radius,
                color=(0, 0, 255), thickness=-1)
-    cv2.line(im, centre, top_midpoint, color=(0, 0, 255), thickness=3)
+    cv2.line(img, centre, top_midpoint, color=(0, 0, 255), thickness=3)
 
 
 if __name__ == "__main__":

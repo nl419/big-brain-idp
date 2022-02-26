@@ -1,3 +1,5 @@
+"""Fast tracking of a QR code in a video with the use of cropping"""
+
 import cv2
 import sys
 from find_qr import *
