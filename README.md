@@ -33,8 +33,8 @@ The changes are now synced with the online repo! See https://github.com/nl419/bi
 ## TODO list
 
 - [ ] Redo checkerboard calibration
-- [ ] Track orientation
+- [x] Track orientation
 - [ ] Make tracking robust vs lighting changes
 - [ ] Navigation code
-- [ ] Arduino WiFi code
+- [x] Arduino WiFi code
 - [ ] Laptop WiFi code
