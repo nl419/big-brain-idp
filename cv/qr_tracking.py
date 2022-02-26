@@ -5,18 +5,16 @@ from find_qr import *
 # Credit: https://learnopencv.com/opencv-qr-code-scanner-c-and-python/
 # Generate QR codes with https://barcode.tec-it.com/en/QRCode
 
-# Obtain an affirmative lock (QRData is correct)
-# Create a circular mask around the previous known center
-# On next frame, search for qr code within that mask
-# If tracking lost for 5 frames in a row, go to step 1
-
 video_file = 'test_vids/qr2.mp4'
-RESOLUTION = (np.array((1920, 1080)) / 2).astype(int)
-TRACKER = False  # Whether to use an ROI tracking method
+DIM = (np.array((1920, 1080))).astype(int)
+USE_CROP = True # Whether to crop image around an estimated QR code area
+TRACKER = False  # True = ROI tracker, False = QR tracker
+CROP_RADIUS = 200 # radius around last known point for cropping, used when TRACKER = False
+
 
 if __name__ == '__main__':
     cv2.namedWindow("Tracking", cv2.WINDOW_NORMAL)
-    cv2.resizeWindow("Tracking", RESOLUTION[0], RESOLUTION[1])
+    cv2.resizeWindow("Tracking", int(DIM[0]/1.5), int(DIM[1]/1.5))
     if TRACKER:
         tracker_types = ['KCF', 'CSRT']
         tracker_index = 1
@@ -27,9 +25,9 @@ if __name__ == '__main__':
 
         print("Selected tracker type", tracker_type)
     else:
-        lastCentre = None
+        lastCentre = np.zeros(2).astype(int)
         track_timeout = 5  # How many frames of consecutive tracking failure before resetting lastCentre
-        track_fail_count = 0
+        track_fail_count = track_timeout
 
     # Read video
     video = cv2.VideoCapture(video_file)
@@ -47,7 +45,7 @@ if __name__ == '__main__':
 
     qrDecoder = cv2.QRCodeDetector()
 
-    if TRACKER:
+    if USE_CROP and TRACKER:
         roi = cv2.selectROI("Tracking", frame, False)
         # Initialize tracker with first frame and bounding box
         ok = tracker.init(frame, roi)
@@ -61,34 +59,39 @@ if __name__ == '__main__':
         # Start timer
         timer = cv2.getTickCount()
 
-        if TRACKER:
-            ok, roi = tracker.update(frame)
+        transform = [0,0] # Transformation from cropped coords to real coords
+        if USE_CROP:
+            if TRACKER:
+                ok, roi = tracker.update(frame)
 
-            # Draw bounding box
-            if ok:
-                # Tracking success
-                p1 = (int(roi[0]), int(roi[1]))
-                p2 = (int(roi[0] + roi[2]), int(roi[1] + roi[3]))
-                cv2.rectangle(frame, p1, p2, (255, 0, 0), 2, 1)
+                # Draw bounding box
+                if ok:
+                    # Tracking success
+                    p1 = (int(roi[0]), int(roi[1]))
+                    p2 = (int(roi[0] + roi[2]), int(roi[1] + roi[3]))
+                    cv2.rectangle(frame, p1, p2, (255, 0, 0), 2, 1)
+                    qrframe = frame[p1[1]:p2[1],p1[0]:p2[0]]
+                    transform = p1
+                else:
+                    # Tracking failure
+                    cv2.putText(frame, "Tracking failure detected", (100, 80),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0, 0, 255), 2)
             else:
-                # Tracking failure
-                cv2.putText(frame, "Tracking failure detected", (100, 80),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0, 0, 255), 2)
-            qrframe = frame
-        elif track_fail_count < track_timeout:
-            # https://stackoverflow.com/questions/42004652/how-can-i-find-contours-inside-roi-using-opencv-and-python
-            black = np.zeros((frame.shape[0], frame.shape[1], 3), np.uint8)
-            cv2.circle(black, lastCentre, 200, (255,255,255), -1)
-            gray = cv2.cvtColor(black, cv2.COLOR_BGR2GRAY)
-            ret, b_mask = cv2.threshold(gray, 127, 255, 0)
-            qrframe = cv2.bitwise_and(frame, frame, mask=b_mask)
+                if track_fail_count < track_timeout:
+                    qrframe = frame[lastCentre[1] - CROP_RADIUS:lastCentre[1] + CROP_RADIUS,
+                                    lastCentre[0] - CROP_RADIUS:lastCentre[0] + CROP_RADIUS]
+                    transform = [lastCentre[0] - CROP_RADIUS, lastCentre[1] - CROP_RADIUS]
+                else:
+                    qrframe = frame
+            found, bbox = qrDecoder.detect(qrframe)
         else:
-            qrframe = frame
+            found, bbox = qrDecoder.detect(frame)
 
-        # Detect the qrcode
-        found, bbox = qrDecoder.detect(frame)
         if found:
             bbox = bbox[0]  # bbox is always a unit length list, so just grab the first element
+            for i in range(len(bbox)):
+                bbox[i,0] += transform[0]
+                bbox[i,1] += transform[1]
             shape_data = getQRShape(bbox)
             isValid = shape_data[0] < 300**2 and shape_data[0] > 60**2 and shape_data[1] > 0.98
             # text_data = getQRData(frame, bbox, qrDecoder)
@@ -103,8 +106,9 @@ if __name__ == '__main__':
                 else:
                     track_fail_count += 1
         else:
-            cv2.putText(frame, "QR code not detected", (100, 80),
+            cv2.putText(frame, "QR code not detected", (100, 150),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0, 0, 255), 2)
+            track_fail_count += 1
 
         # Calculate Frames per second (FPS)
         fps = cv2.getTickFrequency() / (cv2.getTickCount() - timer)
@@ -112,8 +116,14 @@ if __name__ == '__main__':
         # Display FPS on frame
         cv2.putText(frame, "FPS : " + str(int(fps)), (100, 50),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.75, (50, 170, 50), 2)
+        # Display fails on frame
+        cv2.putText(frame, "fails : " + str(int(track_fail_count)), (100, 100),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.75, (50, 170, 50), 2)
         # Display result
+        
+        cv2.rectangle(frame, (1,1), (DIM[0] - 2, DIM[1] - 2), (0,0,255), 2)
         cv2.imshow("Tracking", frame)
+        # cv2.imshow("Tracking", qrframe)
 
         # Exit if ESC pressed
         # cv2.waitKey(0)
