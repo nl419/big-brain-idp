@@ -1,34 +1,16 @@
 import cv2
-from matplotlib.pyplot import text
-import numpy as np
 import sys
 from find_qr import *
 
 # Credit: https://learnopencv.com/opencv-qr-code-scanner-c-and-python/
 # Generate QR codes with https://barcode.tec-it.com/en/QRCode
 
-# Obtain an affirmative lock (checkValidQRData is true)
+# Obtain an affirmative lock (QRData is correct)
 # Create a circular mask around the previous known center
 # On next frame, search for qr code within that mask
 # If tracking lost for 5 frames in a row, go to step 1
 
 video_file = 'test_vids/qr2.mp4'
-
-# Add bounding box & orientation markers
-def drawMarkers(im, bbox, lineColour):
-    x = bbox[0].astype(int)
-    n = len(x)
-    for j in range(n):
-        p1 = tuple(x[j])
-        p2 = tuple(x[(j+1) % n])
-        cv2.line(im, p1, p2, lineColour, 3)
-
-    centre = np.mean(x, axis=0).astype(int)
-    top_midpoint = np.mean(x[0:2], axis=0).astype(int)
-    marker_radius = 5
-    cv2.circle(im, centre, radius=marker_radius, color=(0,0,255), thickness=-1)
-    cv2.circle(im, top_midpoint, radius=marker_radius, color=(0,0,255), thickness=-1)
-    cv2.line(im, centre, top_midpoint, color=(0,0,255), thickness=3)
 
 if __name__ == '__main__' :
     tracker_types = ['KCF', 'CSRT']
@@ -79,7 +61,7 @@ if __name__ == '__main__' :
             p1 = (int(roi[0]), int(roi[1]))
             p2 = (int(roi[0] + roi[2]), int(roi[1] + roi[3]))
             cv2.rectangle(frame, p1, p2, (255,0,0), 2, 1)
-        else :
+        else:
             # Tracking failure
             cv2.putText(frame, "Tracking failure detected", (100,80), cv2.FONT_HERSHEY_SIMPLEX, 0.75,(0,0,255),2)
 
