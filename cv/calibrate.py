@@ -1,3 +1,6 @@
+"""Calibrate unfisheye coefficients using images containing a known checkerboard pattern.
+Paste the coefficients into unfisheye.py to see the results."""
+
 import cv2
 assert cv2.__version__[0] >= '3', 'The fisheye module requires opencv version >= 3.0.0'
 import numpy as np
@@ -5,11 +8,19 @@ import os
 import glob
 import imutils
 
-CHECKERBOARD = (6,9)
-folder_name = "checkerboard2"
-# RESOLUTION = np.array([1806, 1440]) // 2    # Checkerboard
-RESOLUTION = np.array([1016, 760])   # Checkerboard2
-DEBUG = True
+### VARIABLES
+
+CHECKERBOARD = (6,9)                            # Number of internal corners in checkerboard
+folder_name = "checkerboard2"                   # Folder containing checkerboard images
+# RESOLUTION = np.array([1806, 1440]) // 2      # For Checkerboard
+RESOLUTION = np.array([1016, 760])              # For Checkerboard2
+DEBUG = True                                    # Whether to see intermediate images
+
+# Flags for calibration - uncomment as appropriate
+FLAGS = cv2.CALIB_CB_ADAPTIVE_THRESH+cv2.CALIB_CB_FAST_CHECK+cv2.CALIB_CB_NORMALIZE_IMAGE
+# FLAGS = cv2.CALIB_CB_ADAPTIVE_THRESH+cv2.CALIB_CB_NORMALIZE_IMAGE
+
+### END OF VARIABLES
 
 subpix_criteria = (cv2.TERM_CRITERIA_EPS+cv2.TERM_CRITERIA_MAX_ITER, 30, 0.1)
 calibration_flags = cv2.fisheye.CALIB_RECOMPUTE_EXTRINSIC+cv2.fisheye.CALIB_FIX_SKEW
@@ -21,10 +32,12 @@ imgpoints = [] # 2d points in image plane.
 DEBUG = DEBUG and __name__ == "__main__"
 #images = glob.glob('*.jpg')
 def load_images_from_folder(folder):
+    count = 0
     images = []
     for filename in os.listdir(folder):
         img = cv2.imread(os.path.join(folder,filename), cv2.IMREAD_GRAYSCALE)
         if img is not None:
+            count += 1
             img = cv2.resize(img, RESOLUTION.tolist())
             img = cv2.adaptiveThreshold(img, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,\
                 cv2.THRESH_BINARY,21,2)
@@ -38,6 +51,7 @@ def load_images_from_folder(folder):
                 cv2.waitKey(0)
             images.append(img)
     cv2.destroyAllWindows()
+    print("Found", count, "images in folder", folder)
     return images
 
 images = load_images_from_folder(folder_name)
@@ -51,7 +65,7 @@ for img in images:
     # gray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
     gray = img
     # Find the chess board corners
-    ret, corners = cv2.findChessboardCorners(gray, CHECKERBOARD, cv2.CALIB_CB_ADAPTIVE_THRESH+cv2.CALIB_CB_FAST_CHECK+cv2.CALIB_CB_NORMALIZE_IMAGE)
+    ret, corners = cv2.findChessboardCorners(gray, CHECKERBOARD, FLAGS)
     # If found, add object points, image points (after refining them)
     if ret == True:
         img = cv2.drawChessboardCorners(img, CHECKERBOARD, corners, True)
