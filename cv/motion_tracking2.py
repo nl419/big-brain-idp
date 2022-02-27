@@ -1,4 +1,8 @@
-"""First attempt at using meanshift to track an object. Meanshift just tracks the brightest spot on the image"""
+"""First attempt at using meanshift to track an object. 
+Meanshift just tracks the brightest spot on the image.
+So this is only useful if, via image processing, you have
+made the part you want to track be very bright.
+E.g. edge detection & thresholding"""
 
 import numpy as np
 import cv2
