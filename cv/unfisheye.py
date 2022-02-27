@@ -47,7 +47,6 @@ def undistort(img: np.ndarray , balance=0.0, dim2=None, dim3=None) -> np.ndarray
     undistorted_img : np.ndarray
         The image without distortion
     """
-    # img = cv2.resize(img, DIM)
     if debug:
         cv2.imshow("input", img)
         cv2.waitKey(0)
@@ -58,10 +57,13 @@ def undistort(img: np.ndarray , balance=0.0, dim2=None, dim3=None) -> np.ndarray
         dim2 = dim1
     if not dim3:
         dim3 = dim1
+    
     scaled_K = K * dim1[0] / DIM[0]  # The values of K is to scale with image dimension.
     scaled_K[2][2] = 1.0  # Except that K[2][2] is always 1.0
     # This is how scaled_K, dim2 and balance are used to determine the final K used to un-distort image. 
     # OpenCV document failed to make this clear!
+
+    # Select balance
     new_K = cv2.fisheye.estimateNewCameraMatrixForUndistortRectify(scaled_K, D, dim2, np.eye(3), balance=balance)
     map1, map2 = cv2.fisheye.initUndistortRectifyMap(scaled_K, D, np.eye(3), new_K, dim3, cv2.CV_16SC2)
     undistorted_img = cv2.remap(img, map1, map2, 
