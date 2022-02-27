@@ -8,7 +8,7 @@ https://numpydoc.readthedocs.io/en/latest/format.html
 
 ## Installation instructions
 - `pip uninstall opencv-python`
-- `pip install opencv-contrib-python`
+- `pip install opencv-contrib-python imutils`
 - Open a VS Code Window
 - Open the command palette: View -> Command Palette... (Ctrl+Shift+P)
 - Start typing "git clone" and click on "Git: Clone"
