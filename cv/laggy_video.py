@@ -9,7 +9,7 @@ but always stay in sync with video
 ...  time.sleep(.5)   # simulate time between events
 ...  frame = cap.read()
 ...  cv2.imshow("frame", frame)
-...  waitKey(1)
+...  cv2.waitKey(1)
 """
 
 import cv2, queue, threading, time
@@ -29,7 +29,7 @@ class VideoCapture:
   ...  time.sleep(.5)   # simulate time between events
   ...  frame = cap.read()
   ...  cv2.imshow("frame", frame)
-  ...  waitKey(1)
+  ...  cv2.waitKey(1)
   """
   def __init__(self, name):
     self.cap = cv2.VideoCapture(name)

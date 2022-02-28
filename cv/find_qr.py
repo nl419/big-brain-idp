@@ -84,6 +84,12 @@ def drawMarkers(img: np.ndarray, points: "list[int]", lineColour: "list[int]"):
         List of (x,y) coordinates of the bounding box vertices
     lineColour : list[int]
         Colour (B,G,R) of lines joining the vertices
+    Returns
+    -------
+    centre : np.ndarray 
+        Centre of bounding box
+    front : np.ndarray
+        Front of bounding box
     """
     x = points.astype(int)
     n = len(x)
@@ -100,6 +106,7 @@ def drawMarkers(img: np.ndarray, points: "list[int]", lineColour: "list[int]"):
     cv2.circle(img, top_midpoint, radius=marker_radius,
                color=(0, 0, 255), thickness=-1)
     cv2.line(img, centre, top_midpoint, color=(0, 0, 255), thickness=3)
+    return centre, top_midpoint
 
 
 if __name__ == "__main__":
