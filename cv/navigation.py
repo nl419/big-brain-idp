@@ -81,16 +81,17 @@ ip = "http://192.168.137.218"
 command = go_to_coord(start, end, front)
 getString = ip + "/TRIGGER/" + str(command[0]) + "/" + str(command[1]) + "///"
 print(getString)
-urllib.request.urlopen(getString)
+# urllib.request.urlopen(getString)
 
 
 from laggy_video import VideoCapture
 from unfisheye import undistort
 from find_qr import *
 
-DIM = (np.array((1016, 760))).astype(int)
-USE_CROP = False
-CROP_RADIUS = 400 # radius around last known point for cropping, used when TRACKER = False
+DIM = (np.array((1016, 760))).astype(int) * 2
+USE_CROP = True
+CROP_RADIUS = 300 # radius around last known point for cropping, used when TRACKER = False
+CROP_SCALE = 2
 
 if __name__ == "__main__":
     video = VideoCapture('http://localhost:8081/stream/video.mjpeg')
@@ -108,7 +109,11 @@ if __name__ == "__main__":
     while True:
         # Read a new frame
         frame = video.read()
+        frame = cv2.resize(frame, DIM)
         frame = undistort(frame, 0.4)
+        win = cv2.namedWindow("Tracking", cv2.WINDOW_NORMAL)
+
+        print(frame.shape)
         # Start timer
         timer = cv2.getTickCount()
 
@@ -116,9 +121,18 @@ if __name__ == "__main__":
         if USE_CROP:
             # Crop and track QR code
             if track_fail_count < track_timeout:
-                qrframe = frame[lastCentre[1] - CROP_RADIUS:lastCentre[1] + CROP_RADIUS,
-                                lastCentre[0] - CROP_RADIUS:lastCentre[0] + CROP_RADIUS]
-                transform = [lastCentre[0] - CROP_RADIUS, lastCentre[1] - CROP_RADIUS]
+                x_clipped = np.array([lastCentre[0] - CROP_RADIUS, lastCentre[0] + CROP_RADIUS]).astype(int)
+                y_clipped = np.array([lastCentre[1] - CROP_RADIUS, lastCentre[1] + CROP_RADIUS]).astype(int)
+                # Limit maximum x and y
+                x_clipped = np.clip(x_clipped, 0, DIM[0] - 1)
+                y_clipped = np.clip(y_clipped, 0, DIM[1] - 1)
+
+                qrframe = frame[y_clipped[0]:y_clipped[1],
+                                x_clipped[0]:x_clipped[1]]
+                transform = [x_clipped[0], y_clipped[0]]
+                crop_dim = np.array([x_clipped[1] - x_clipped[0], y_clipped[1] - y_clipped[0]]).astype(int) * CROP_SCALE
+
+                cv2.resize(qrframe, crop_dim)
             else:
                 qrframe = frame
             # Search for QR code in (potentially cropped) frame
@@ -135,7 +149,8 @@ if __name__ == "__main__":
             
             # check validity
             shape_data = getQRShape(bbox)
-            isValid = shape_data[0] < 100**2 and shape_data[0] > 20**2 and shape_data[1] > 0.98
+            print(shape_data)
+            isValid = shape_data[0] < 16000 and shape_data[0] > 12000 and shape_data[1] > 0.98
             # text_data = getQRData(frame, bbox, qrDecoder)
             # isValid = text_data == "bit.ly/3tbqjqL"
 
@@ -158,8 +173,8 @@ if __name__ == "__main__":
             track_fail_count += 1
         
         # Get motor commands
-        print(centre)
-        print(front)
+        # print(centre)
+        # print(front)
         command = go_to_coord(centre, target, front)
         getString = ip + "/TRIGGER/" + str(command[0]) + "/" + str(command[1]) + "///"
 
@@ -179,13 +194,13 @@ if __name__ == "__main__":
 
         # Send command
         if lastString != getString:
-            urllib.request.urlopen(getString)
+            # urllib.request.urlopen(getString)
             print("sending new command")
             lastString = getString
         
         # cv2.rectangle(frame, (1,1), (DIM[0] - 2, DIM[1] - 2), (0,0,255), 2)
-        cv2.imshow("Tracking", frame)
-        # cv2.imshow("Tracking", qrframe)
+        # cv2.imshow("Tracking", frame)
+        cv2.imshow("Tracking", qrframe)
 
         key = cv2.waitKey(1) & 0xFF
         # Exit if q pressed
