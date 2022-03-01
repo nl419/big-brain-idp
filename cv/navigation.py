@@ -8,9 +8,9 @@ import numpy as np
 import cv2
 
 
-FORWARD = np.array((255,255))
+FORWARD = np.array((-255,-255))
 BACKWARD = -FORWARD
-LEFT = np.array((-100, 100))
+LEFT = np.array((100, -100))
 RIGHT = -LEFT
 
 def go_to_coord (start: np.ndarray, end: np.ndarray, front: np.ndarray,
@@ -65,7 +65,7 @@ def go_to_coord (start: np.ndarray, end: np.ndarray, front: np.ndarray,
     # Generate command
     command = np.zeros(2)
     ### DEBUG: don't attempt to turn around if near point
-    if not doMove: return command.astype(int)
+    if disp_mag < smallMoveThresh: return command.astype(int)
     if doTurn: command += rotation
     if doMove: command += translation
     return np.clip(command, -255, 255).astype(int)
@@ -77,10 +77,11 @@ front = np.array((0.95,0.2))
 
 
 import urllib.request
-ip = "192.168.urmom.urdad"
+ip = "http://192.168.137.218"
 command = go_to_coord(start, end, front)
 getString = ip + "/TRIGGER/" + str(command[0]) + "/" + str(command[1]) + "///"
 print(getString)
+urllib.request.urlopen(getString)
 
 
 from laggy_video import VideoCapture
@@ -100,7 +101,8 @@ if __name__ == "__main__":
 
     target = DIM // 2
     centre = DIM // 2
-    front = np.ndarray((0,0)).astype(int)
+    front = np.array((100,100)).astype(int)
+    print(front)
     getString = ip + "/"
     lastString = ""
     while True:
@@ -156,6 +158,8 @@ if __name__ == "__main__":
             track_fail_count += 1
         
         # Get motor commands
+        print(centre)
+        print(front)
         command = go_to_coord(centre, target, front)
         getString = ip + "/TRIGGER/" + str(command[0]) + "/" + str(command[1]) + "///"
 
