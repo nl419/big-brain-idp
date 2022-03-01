@@ -13,8 +13,22 @@ BACKWARD = -FORWARD
 LEFT = np.array((100, -100))
 RIGHT = -LEFT
 
+# 100 = 1, 255 = 4 => 50 ~= 0
+STALL_SPEED = 50        # Maximum motor speed command which produces zero rotation
+MOVEMENT_SPEED = 44     # Forward/Backward movement speed in px/s on unscaled image
+ROTATION_SPEED = 2 * np.pi / 18.83      # Radians per second
+
+def get_precise_translation(start: np.ndarray, end: np.ndarray, orientation: np.ndarray):
+    displacement = end - start
+    translation = FORWARD
+    if np.dot(displacement, orientation) < 0:
+        translation = BACKWARD
+    # Get time
+
 def go_to_coord (start: np.ndarray, end: np.ndarray, front: np.ndarray,
-                 smallTurnThresh: float = 0.2, largeTurnThresh: float = 0.5):
+                 pixelScale: float = 1,
+                 smallTurnThresh: float = 0.2, largeTurnThresh: float = 0.5,
+                 smallMoveThresh: int = 10, largeMoveThresh: int = 50):
     """Generate the next motor commands for the robot given the start coords, end coords,
     and the coords of the front of the robot.
 
@@ -32,11 +46,20 @@ def go_to_coord (start: np.ndarray, end: np.ndarray, front: np.ndarray,
         Ending coordinates (x,y) of the centre of the robot
     front : np.ndarray
         Coordinates (x,y) of the front of the robot (used for orientation)
+    pixelScale : float
+        Global scaling factor for pixel-based thresholds and speeds
     smallTurnThresh : float 
         Threshold 0->1 for turning while moving
     largeTurnThresh : float
         Threshold 0->1 for turning on the spot. Should be larger than smallTurnThresh.
+    smallMoveThresh : int
+        Threshold in px of distance between start and end for a small movement to be made
+    largeMoveThresh : int
+        Threshold in px of distance between start and end for a large movement to be made
     """
+
+    smallMoveThresh *= pixelScale
+    largeMoveThresh *= pixelScale
 
     orientation = front - start
     displacement = end - start
@@ -47,10 +70,6 @@ def go_to_coord (start: np.ndarray, end: np.ndarray, front: np.ndarray,
     crossp = np.cross(orientation, displacement) / disp_mag / orient_mag
     doTurn = abs(crossp) > smallTurnThresh
     rotation = LEFT if crossp < 0 else RIGHT
-
-    # Translation
-    smallMoveThresh = 10
-    fullMoveThresh = 50
     
     doMove = abs(crossp) < largeTurnThresh and disp_mag > smallMoveThresh
     if np.dot(orientation, displacement) > 0:
@@ -58,7 +77,7 @@ def go_to_coord (start: np.ndarray, end: np.ndarray, front: np.ndarray,
     else:
         translation = BACKWARD
         rotation = -rotation
-    if disp_mag < fullMoveThresh: 
+    if disp_mag < largeMoveThresh: 
         doMove = doMove and (not doTurn)
         translation = translation / 2
 
@@ -77,7 +96,7 @@ front = np.array((0.95,0.2))
 
 
 import urllib.request
-ip = "http://192.168.137.218"
+ip = "http://192.168.137.28"
 command = go_to_coord(start, end, front)
 getString = ip + "/TRIGGER/" + str(command[0]) + "/" + str(command[1]) + "///"
 print(getString)
@@ -87,11 +106,11 @@ print(getString)
 from laggy_video import VideoCapture
 from unfisheye import undistort
 from find_qr import *
-
-DIM = (np.array((1016, 760))).astype(int) * 2
+GLOBAL_SCALE = 2
+DIM = (np.array((1016, 760)) * GLOBAL_SCALE).astype(int)
 USE_CROP = True
-CROP_RADIUS = 300 # radius around last known point for cropping, used when TRACKER = False
-CROP_SCALE = 2
+CROP_RADIUS = 200 # radius around last known point for cropping, used when TRACKER = False
+CROP_SCALE = 1.5
 
 if __name__ == "__main__":
     video = VideoCapture('http://localhost:8081/stream/video.mjpeg')
@@ -113,11 +132,12 @@ if __name__ == "__main__":
         frame = undistort(frame, 0.4)
         win = cv2.namedWindow("Tracking", cv2.WINDOW_NORMAL)
 
-        print(frame.shape)
+        # print(frame.shape)
         # Start timer
         timer = cv2.getTickCount()
 
         transform = [0,0] # Transformation from cropped coords to real coords
+        scale = 1
         if USE_CROP:
             # Crop and track QR code
             if track_fail_count < track_timeout:
@@ -130,9 +150,10 @@ if __name__ == "__main__":
                 qrframe = frame[y_clipped[0]:y_clipped[1],
                                 x_clipped[0]:x_clipped[1]]
                 transform = [x_clipped[0], y_clipped[0]]
-                crop_dim = np.array([x_clipped[1] - x_clipped[0], y_clipped[1] - y_clipped[0]]).astype(int) * CROP_SCALE
-
-                cv2.resize(qrframe, crop_dim)
+                crop_dim = np.array([x_clipped[1] - x_clipped[0], y_clipped[1] - y_clipped[0]]) * CROP_SCALE
+                crop_dim = np.int0(crop_dim)
+                scale = CROP_SCALE
+                qrframe = cv2.resize(qrframe, crop_dim)
             else:
                 qrframe = frame
             # Search for QR code in (potentially cropped) frame
@@ -144,13 +165,14 @@ if __name__ == "__main__":
             bbox = bbox[0]  # bbox is always a unit length list, so just grab the first element
             # now bbox is a list of 4 vertices relative to cropped coords, so transform them
             for i in range(len(bbox)):
+                bbox[i] /= scale
                 bbox[i,0] += transform[0]
                 bbox[i,1] += transform[1]
             
             # check validity
             shape_data = getQRShape(bbox)
-            print(shape_data)
-            isValid = shape_data[0] < 16000 and shape_data[0] > 12000 and shape_data[1] > 0.98
+            # print(shape_data)
+            isValid = shape_data[0] < 20000 and shape_data[0] > 10000 and shape_data[1] > 0.98
             # text_data = getQRData(frame, bbox, qrDecoder)
             # isValid = text_data == "bit.ly/3tbqjqL"
 
@@ -175,7 +197,7 @@ if __name__ == "__main__":
         # Get motor commands
         # print(centre)
         # print(front)
-        command = go_to_coord(centre, target, front)
+        command = go_to_coord(centre, target, front, scale * GLOBAL_SCALE)
         getString = ip + "/TRIGGER/" + str(command[0]) + "/" + str(command[1]) + "///"
 
         # Calculate Frames per second (FPS)
@@ -199,8 +221,8 @@ if __name__ == "__main__":
             lastString = getString
         
         # cv2.rectangle(frame, (1,1), (DIM[0] - 2, DIM[1] - 2), (0,0,255), 2)
-        # cv2.imshow("Tracking", frame)
-        cv2.imshow("Tracking", qrframe)
+        cv2.imshow("Tracking", frame)
+        # cv2.imshow("Tracking", qrframe)
 
         key = cv2.waitKey(1) & 0xFF
         # Exit if q pressed
@@ -209,5 +231,6 @@ if __name__ == "__main__":
         # If ENTER pressed, reset target
         if key == 13:
             target = centre
+            print(target)
             
     cv2.destroyAllWindows()
