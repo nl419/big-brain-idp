@@ -18,12 +18,64 @@ STALL_SPEED = 50        # Maximum motor speed command which produces zero rotati
 MOVEMENT_SPEED = 44     # Forward/Backward movement speed in px/s on unscaled image
 ROTATION_SPEED = 2 * np.pi / 18.83      # Radians per second
 
-def get_precise_translation(start: np.ndarray, end: np.ndarray, orientation: np.ndarray):
-    displacement = end - start
+def get_precise_translation(distance: float, scale: float = 1):
+    """Get a motor command and duration in order to execute a precise translation
+
+    Parameters
+    ----------
+    distance : float
+        The distance to travel in the forward direction in px
+    scale : float, optional
+        How much the video has been scaled from (1016,760), by default 1
+
+    Returns
+    -------
+    commands : np.ndarray
+        The motor commands to be sent
+    time : float
+        The duration of time for the command to be run in seconds
+    """
+    
+    distance /= scale
     translation = FORWARD
-    if np.dot(displacement, orientation) < 0:
+    if distance < 0:
         translation = BACKWARD
-    # Get time
+    
+    return translation, distance / MOVEMENT_SPEED
+
+def get_precise_rotation (orientation: np.ndarray, target_orientation: np.ndarray, backwardOk: bool = True):
+    """Get a motor command and duration in order to execute a precise rotation
+
+    Parameters
+    ----------
+    orientation : np.ndarray
+        A vector pointing in the forward direction of the robot
+    target_orientation : np.ndarray
+        A target vector to be parallel with
+    backwardOk : bool, optional
+        Whether being aligned with the backward direction is ok, by default True
+
+    Returns
+    -------
+    commands : np.ndarray
+        The motor commands to be sent
+    time : float
+        The duration of time for the command to be run in seconds
+    """
+
+    cross = np.cross(orientation, target_orientation)
+    dot = np.dot(orientation, target_orientation) / np.linalg.norm(orientation) / np.linalg.norm(target_orientation)
+
+    rotation = LEFT if cross < 0 else RIGHT
+    if backwardOk and dot < 0:
+        rotation = RIGHT if cross < 0 else LEFT
+        angle = np.arccos(-dot)
+    else:
+        angle = np.arccos(dot)
+    
+    return rotation, angle / ROTATION_SPEED
+    
+
 
 def go_to_coord (start: np.ndarray, end: np.ndarray, front: np.ndarray,
                  pixelScale: float = 1,
