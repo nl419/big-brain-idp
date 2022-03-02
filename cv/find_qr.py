@@ -6,10 +6,6 @@ import numpy as np
 # Generate QR codes with https://barcode.tec-it.com/en/QRCode,
 # or with the extension in InkScape (Extensions > Render > Barcode > QR Code...)
 
-DECODE = False  # Whether to additionally decode the QR code
-img = cv2.imread("qr_codes/small/rotated.png")
-# img = cv2.imread("qr_codes/small/original.png")
-
 
 def getQRData(img: np.ndarray, bbox: list, decoder: cv2.QRCodeDetector) -> str or None:
     """Return the data within a QR code, if valid.
@@ -108,8 +104,164 @@ def drawMarkers(img: np.ndarray, points: "list[int]", lineColour: "list[int]"):
     cv2.line(img, centre, top_midpoint, color=(0, 0, 255), thickness=3)
     return centre, top_midpoint
 
+from laggy_video import VideoCapture
+from unfisheye import undistort
 
-if __name__ == "__main__":
+class QRVideo:
+    filename: str
+    video: VideoCapture
+    decoder = cv2.QRCodeDetector()
+    global_scale: float     # How much to scale the frame globally
+    crop_scale: float       # How much to additionally scale the frame after cropping
+    crop_radius: int
+
+    lastCentre = np.zeros(2).astype(int)
+    front = np.array((100,100)).astype(int)
+    track_timeout = 5  # How many frames of consecutive tracking failure before resetting lastCentre
+    track_fail_count = track_timeout # Always reset on first frame
+    target = lastCentre
+    centre = lastCentre
+    
+    def __init__(self, filename: str, global_scale: float = 1, crop_scale: float = 1, crop_radius: int = 150):
+        """QR Tracker class, designed to work on a video stream
+
+        Parameters
+        ----------
+        filename : str
+            The filename (or http address) of the video stream
+        global_scale : float, optional
+            How much to scale the image before finding the QR code, by default 1
+        crop_scale : float, optional
+            How much to scale the image after cropping, before finding the QR code, by default 1
+        crop_radius : int, optional
+            Radius of the cropping bounding box, by default 150
+        """
+
+        self.filename = filename
+        self.video = VideoCapture(filename)
+        self.global_scale = global_scale
+        self.crop_scale = crop_scale
+        self.crop_radius = crop_radius
+    
+    def find(self, use_crop: bool = True):
+        """Find the QR code in the latest video frame
+
+        Parameters
+        ----------
+        use_crop : bool, optional
+            Whether to crop into the last known location of the QR code, by default True
+
+        Returns
+        -------
+        frame : np.ndarray
+            The latest video frame with FPS and QR code annotations
+        found : bool
+            Whether a valid QR code was found
+        centre : np.ndarray or None
+            Coordinates of the centre of the QR code, if found
+        front : np.ndarray or None
+            Coordinates of the front of the QR code, if found
+        """
+
+        timer = cv2.getTickCount()
+        # Read a new frame
+        frame = self.video.read()
+        OLDDIM = np.array([frame.shape[1], frame.shape[0]]).astype(int)
+        DIM = OLDDIM * self.global_scale
+        print(DIM)
+        frame = cv2.resize(frame, DIM)
+        frame = undistort(frame, 0.4)
+
+        # Return foundBool, centre, front, all in the unscaled coordinates
+        transform = [0,0]
+        scale = 1
+        if use_crop:
+            CROP_RADIUS = self.crop_radius * self.global_scale # Crop radius in global coordinates
+            # Crop and track QR code
+            if self.track_fail_count < self.track_timeout:
+                x_clipped = np.array([self.lastCentre[0] - CROP_RADIUS, self.lastCentre[0] + CROP_RADIUS]).astype(int)
+                y_clipped = np.array([self.lastCentre[1] - CROP_RADIUS, self.lastCentre[1] + CROP_RADIUS]).astype(int)
+                # Limit maximum x and y
+                x_clipped = np.clip(x_clipped, 0, DIM[0] - 1)
+                y_clipped = np.clip(y_clipped, 0, DIM[1] - 1)
+
+                # Crop the image
+                qrframe = frame[y_clipped[0]:y_clipped[1],
+                                x_clipped[0]:x_clipped[1]]
+
+                # Scale the cropped image
+                crop_dim = np.array([x_clipped[1] - x_clipped[0], y_clipped[1] - y_clipped[0]]) * self.crop_scale
+                crop_dim = np.int0(crop_dim)
+                qrframe = cv2.resize(qrframe, crop_dim)
+
+                # Update data for going from cropped coords to global coords
+                transform = [x_clipped[0], y_clipped[0]]
+                scale = self.crop_scale
+            else:
+                qrframe = frame
+            # Search for QR code in (potentially cropped) frame
+            found, bbox = self.decoder.detect(qrframe)
+        else: # No cropping
+            found, bbox = self.decoder.detect(frame)
+        
+        centre = None
+        front = None
+        isValid = False
+        if found:
+            bbox = bbox[0]  # bbox is always a unit length list, so just grab the first element
+            # now bbox is a list of 4 vertices relative to cropped coords, so transform them
+            for i in range(len(bbox)):
+                bbox[i] /= scale
+                bbox[i,0] += transform[0]
+                bbox[i,1] += transform[1]
+            
+            # check validity
+            shape_data = getQRShape(bbox)
+            isValid = shape_data[0] < 20000 and shape_data[0] > 10000 and shape_data[1] > 0.98
+            # text_data = getQRData(frame, bbox, qrDecoder)
+            # isValid = text_data == "bit.ly/3tbqjqL"
+
+            # Draw blue border if valid, green otherwise.
+            if isValid:
+                centre, front = drawMarkers(frame, bbox, (255, 0, 0))
+                centre = centre / self.global_scale
+                front = front / self.global_scale
+            else:
+                drawMarkers(frame, bbox, (0, 255, 0))
+
+            # update position estimate and failure counter
+            if use_crop:
+                if isValid:
+                    self.lastCentre = np.mean(bbox, axis=0).astype(int)
+                    self.track_fail_count = 0
+                else:
+                    self.track_fail_count += 1
+        else: # not found
+            cv2.putText(frame, "QR code not detected", (100, 150),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0, 0, 255), 2)
+            self.track_fail_count += 1
+
+        fps = cv2.getTickFrequency() / (cv2.getTickCount() - timer)
+            
+        # Display FPS on frame
+        cv2.putText(frame, "FPS : " + str(int(fps)), (100, 50),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.75, (50, 170, 50), 2)
+        # Display fails on frame
+        cv2.putText(frame, "fails : " + str(int(self.track_fail_count)), (100, 100),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.75, (50, 170, 50), 2)
+
+        cv2.resize(frame, OLDDIM)
+
+        return frame, found and isValid, centre, front
+
+def _find_decode_test():
+    """Test the finding and/or decoding of a QR code
+    """
+    DECODE = False  # Whether to additionally decode the QR code
+    img = cv2.imread("qr_codes/small/rotated.png")
+    # img = cv2.imread("qr_codes/small/original.png")
+
+    # Find / decode a single QR code
     qrDecoder = cv2.QRCodeDetector()
     if DECODE:
         # Detect and decode the qrcode
@@ -132,3 +284,18 @@ if __name__ == "__main__":
         cv2.imshow("Results", img)
     cv2.waitKey(0)
     cv2.destroyAllWindows()
+
+def _QRVideo_test():
+    finder = QRVideo('http://localhost:8081/stream/video.mjpeg', 2, 2)
+    cv2.namedWindow("Tracking", cv2.WINDOW_NORMAL)
+    while 1:
+        frame, _, _, _ = finder.find()
+        cv2.imshow("Tracking", frame)
+        key = cv2.waitKey(1) & 0xFF
+        # Exit if q pressed
+        if key == ord('q'):
+            break
+
+if __name__ == "__main__":
+    # _find_decode_test()
+    _QRVideo_test()
