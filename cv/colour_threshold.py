@@ -9,10 +9,19 @@ def nothing(x):
     pass
 
 # Load in image
-image = cv2.imread('cv/2.jpg')
+image = cv2.imread('qr_codes/dot4.jpg')
+# Optionally undistort the image
+from unfisheye import undistort
+image = undistort(image)
 
-# Create a window
-cv2.namedWindow('image')
+SHOW_MASK = False # False => show entire image after threshold, True => just show mask
+
+# Set initial values
+hMin = 140; sMin = 90; vMin = 101; hMax = 166; sMax = 255; vMax = 255
+
+# Create a window, scale it to fit screen
+win = cv2.namedWindow('image', cv2.WINDOW_GUI_NORMAL)
+cv2.resizeWindow('image', 600, 600)
 
 # create trackbars for color change
 cv2.createTrackbar('HMin','image',0,179,nothing) # Hue is from 0-179 for Opencv
@@ -22,10 +31,13 @@ cv2.createTrackbar('HMax','image',0,179,nothing)
 cv2.createTrackbar('SMax','image',0,255,nothing)
 cv2.createTrackbar('VMax','image',0,255,nothing)
 
-# Set default value for MAX HSV trackbars.
-cv2.setTrackbarPos('HMax', 'image', 179)
-cv2.setTrackbarPos('SMax', 'image', 255)
-cv2.setTrackbarPos('VMax', 'image', 255)
+# Set default value for trackbars
+cv2.setTrackbarPos('HMax', 'image', hMax)
+cv2.setTrackbarPos('SMax', 'image', sMax)
+cv2.setTrackbarPos('VMax', 'image', vMax)
+cv2.setTrackbarPos('HMin', 'image', hMin)
+cv2.setTrackbarPos('SMin', 'image', sMin)
+cv2.setTrackbarPos('VMin', 'image', vMin)
 
 # Initialize to check if HSV min/max value changes
 hMin = sMin = vMin = hMax = sMax = vMax = 0
@@ -65,7 +77,10 @@ while(1):
         pvMax = vMax
 
     # Display output image
-    cv2.imshow('image',output)
+    if SHOW_MASK:
+        cv2.imshow('image',mask)
+    else:
+        cv2.imshow('image',output)
 
     # Wait longer to prevent freeze for videos.
     if cv2.waitKey(wait_time) & 0xFF == ord('q'):
