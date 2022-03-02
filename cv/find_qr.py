@@ -261,6 +261,16 @@ class QRVideo:
         # return qrframe, found and isValid, centre, front
         return frame, found and isValid, centre, front
 
+def QR_finder_better(frame: np.ndarray):
+    # It's not actually better...
+    k = (7,7)
+    thresh = cv2.morphologyEx(frame, cv2.MORPH_TOPHAT, k)
+    thresh = cv2.dilate(thresh, k, iterations=10)
+    thresh = cv2.blur(thresh, k)
+    # thresh = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, (10,10), iterations=5)
+    cv2.imshow("tawoyiaw", thresh)
+    cv2.waitKey(0)
+
 def _find_decode_test():
     """Test the finding and/or decoding of a QR code
     """
@@ -305,4 +315,6 @@ def _QRVideo_test():
 
 if __name__ == "__main__":
     # _find_decode_test()
-    _QRVideo_test()
+    # _QRVideo_test()
+    frame = cv2.imread("qr_codes/1.jpg")
+    QR_finder_better(frame)
