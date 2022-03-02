@@ -121,14 +121,18 @@ class QRVideo:
     track_fail_count = track_timeout # Always reset on first frame
     target = lastCentre
     centre = lastCentre
+
+    balance = 0
     
-    def __init__(self, filename: str, global_scale: float = 2, crop_scale: float = 1, crop_radius: int = 150):
+    def __init__(self, filename: str, balance: float = 0, global_scale: float = 2, crop_scale: float = 1, crop_radius: int = 150):
         """QR Tracker class, designed to work on a video stream
 
         Parameters
         ----------
         filename : str
             The filename (or http address) of the video stream
+        balance : float
+            How much of the black areas to include in the image (due to fisheye effects)
         global_scale : float, optional
             How much to scale the image before finding the QR code, by default 2
         crop_scale : float, optional
@@ -142,6 +146,7 @@ class QRVideo:
         self.global_scale = global_scale
         self.crop_scale = crop_scale
         self.crop_radius = crop_radius
+        self.balance = balance
     
     def find(self, use_crop: bool = True):
         """Find the QR code in the latest video frame
@@ -167,9 +172,9 @@ class QRVideo:
         # Read a new frame
         frame = self.video.read()
         OLDDIM = np.array([frame.shape[1], frame.shape[0]]).astype(int)
-        DIM = OLDDIM * self.global_scale
+        DIM = np.int0(OLDDIM * self.global_scale)
         frame = cv2.resize(frame, DIM)
-        frame = undistort(frame, 0.4)
+        frame = undistort(frame, self.balance)
 
         # Return foundBool, centre, front, all in the unscaled coordinates
         transform = [0,0]
@@ -251,10 +256,10 @@ class QRVideo:
         cv2.putText(frame, "fails : " + str(int(self.track_fail_count)), (100, 100),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.75, (50, 170, 50), 2)
 
-        cv2.resize(frame, OLDDIM)
+        frame = cv2.resize(frame, OLDDIM)
 
-        return qrframe, found and isValid, centre, front
-        # return frame, found and isValid, centre, front
+        # return qrframe, found and isValid, centre, front
+        return frame, found and isValid, centre, front
 
 def _find_decode_test():
     """Test the finding and/or decoding of a QR code
@@ -288,7 +293,7 @@ def _find_decode_test():
     cv2.destroyAllWindows()
 
 def _QRVideo_test():
-    finder = QRVideo('http://localhost:8081/stream/video.mjpeg', 2, 1)
+    finder = QRVideo('http://localhost:8081/stream/video.mjpeg', 0, 2, 1)
     cv2.namedWindow("Tracking", cv2.WINDOW_NORMAL)
     while 1:
         frame, _, _, _ = finder.find()
