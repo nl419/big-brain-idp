@@ -2,11 +2,11 @@
 
 import cv2
 
-folder = "checkerboard2"
+folder = "qr_codes"
 
 print ("starting grab")
 cap = cv2.VideoCapture('http://localhost:8081/stream/video.mjpeg')
-counter = 26
+counter = 1
 while True:
     ret, frame = cap.read()
     cv2.imshow('Video', frame)
