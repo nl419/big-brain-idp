@@ -8,7 +8,7 @@ import numpy as np
 import cv2
 
 
-FORWARD = np.array((-255,-255))
+FORWARD = np.array((-250,-255))
 BACKWARD = -FORWARD
 LEFT = np.array((100, -100))
 RIGHT = -LEFT
@@ -16,7 +16,7 @@ RIGHT = -LEFT
 # 100 = 1, 255 = 4 => 50 ~= 0
 STALL_SPEED = 50        # Maximum motor speed command which produces zero rotation
 MOVEMENT_SPEED = 44     # Forward/Backward movement speed in px/s on unscaled image
-ROTATION_SPEED = 2 * np.pi / 18.83      # Radians per second
+ROTATION_SPEED = 2 * np.pi / 18      # Radians per second
 
 def get_precise_translation(distance: float, scale: float = 1):
     """Get a motor command and duration in order to execute a precise translation
@@ -41,7 +41,7 @@ def get_precise_translation(distance: float, scale: float = 1):
     if distance < 0:
         translation = BACKWARD
     
-    return translation, distance / MOVEMENT_SPEED
+    return translation, abs(distance) / MOVEMENT_SPEED
 
 def get_precise_rotation (orientation: np.ndarray, target_orientation: np.ndarray, backwardOk: bool = True):
     """Get a motor command and duration in order to execute a precise rotation
@@ -75,6 +75,26 @@ def get_precise_rotation (orientation: np.ndarray, target_orientation: np.ndarra
     
     return rotation, angle / ROTATION_SPEED
     
+def go_to_coord_timed (start: np.ndarray, end: np.ndarray, front: np.ndarray):
+    turnThresh = 5 * np.pi / 180 # 5 degrees
+    moveThresh = 5 # in pixels
+
+    orientation = front - start
+    displacement = end - start
+    orient_mag = np.linalg.norm(orientation)
+    disp_mag = np.linalg.norm(displacement)
+    cross = np.cross(orientation, displacement) / orient_mag / disp_mag
+    dot = np.dot(orientation, displacement) / orient_mag
+    print("Inside:")
+    print(cross)
+    print(dot)
+    print()
+    if disp_mag > moveThresh:
+        if abs(cross) > turnThresh:
+            return get_precise_rotation(orientation, displacement)
+        else:
+            return get_precise_translation(dot)
+    return (0,0),0
 
 
 def go_to_coord (start: np.ndarray, end: np.ndarray, front: np.ndarray,
@@ -148,7 +168,7 @@ front = np.array((0.95,0.2))
 
 
 import urllib.request
-ip = "http://192.168.137.28"
+ip = "http://192.168.137.188"
 command = go_to_coord(start, end, front)
 getString = ip + "/TRIGGER/" + str(command[0]) + "/" + str(command[1]) + "///"
 print(getString)
@@ -164,115 +184,47 @@ USE_CROP = True
 CROP_RADIUS = 200 # radius around last known point for cropping, used when TRACKER = False
 CROP_SCALE = 1.5
 
-if __name__ == "__main__":
-    video = VideoCapture('http://localhost:8081/stream/video.mjpeg')
-    qrDecoder = cv2.QRCodeDetector()
-    lastCentre = np.zeros(2).astype(int)
-    track_timeout = 5  # How many frames of consecutive tracking failure before resetting lastCentre
-    track_fail_count = track_timeout # Always reset on first frame
+MIN_COMMAND_INTERVAL = 500
 
-    target = DIM // 2
-    centre = DIM // 2
-    front = np.array((100,100)).astype(int)
-    print(front)
+import time
+
+if __name__ == "__main__":
+    video = QRVideo('http://localhost:8081/stream/video.mjpeg', 0, 2.5)
+    cv2.namedWindow("Tracking", cv2.WINDOW_NORMAL)
+    old_centre = np.array([100,100])
+    old_front = np.array([200,200])
+    TOL_STATIONARY = 1
+    target = old_centre
+
     getString = ip + "/"
     lastString = ""
+    next_command_time = 0
     while True:
-        # Read a new frame
-        frame = video.read()
-        frame = cv2.resize(frame, DIM)
-        frame = undistort(frame, 0.4)
-        win = cv2.namedWindow("Tracking", cv2.WINDOW_NORMAL)
-
-        # print(frame.shape)
-        # Start timer
-        timer = cv2.getTickCount()
-
-        transform = [0,0] # Transformation from cropped coords to real coords
-        scale = 1
-        if USE_CROP:
-            # Crop and track QR code
-            if track_fail_count < track_timeout:
-                x_clipped = np.array([lastCentre[0] - CROP_RADIUS, lastCentre[0] + CROP_RADIUS]).astype(int)
-                y_clipped = np.array([lastCentre[1] - CROP_RADIUS, lastCentre[1] + CROP_RADIUS]).astype(int)
-                # Limit maximum x and y
-                x_clipped = np.clip(x_clipped, 0, DIM[0] - 1)
-                y_clipped = np.clip(y_clipped, 0, DIM[1] - 1)
-
-                qrframe = frame[y_clipped[0]:y_clipped[1],
-                                x_clipped[0]:x_clipped[1]]
-                transform = [x_clipped[0], y_clipped[0]]
-                crop_dim = np.array([x_clipped[1] - x_clipped[0], y_clipped[1] - y_clipped[0]]) * CROP_SCALE
-                crop_dim = np.int0(crop_dim)
-                scale = CROP_SCALE
-                qrframe = cv2.resize(qrframe, crop_dim)
-            else:
-                qrframe = frame
-            # Search for QR code in (potentially cropped) frame
-            found, bbox = qrDecoder.detect(qrframe)
-        else: # No cropping
-            found, bbox = qrDecoder.detect(frame)
-
+        frame, found, centre, front = video.find()
         if found:
-            bbox = bbox[0]  # bbox is always a unit length list, so just grab the first element
-            # now bbox is a list of 4 vertices relative to cropped coords, so transform them
-            for i in range(len(bbox)):
-                bbox[i] /= scale
-                bbox[i,0] += transform[0]
-                bbox[i,1] += transform[1]
-            
-            # check validity
-            shape_data = getQRShape(bbox)
-            # print(shape_data)
-            isValid = shape_data[0] < 20000 and shape_data[0] > 10000 and shape_data[1] > 0.98
-            # text_data = getQRData(frame, bbox, qrDecoder)
-            # isValid = text_data == "bit.ly/3tbqjqL"
+            # Translate the centre back a little bit
+            orientation = front - centre
+            centre = centre - orientation
 
-            # Draw blue border if valid, green otherwise.
-            if isValid:
-                centre, front = drawMarkers(frame, bbox, (255, 0, 0))
-            else:
-                drawMarkers(frame, bbox, (0, 255, 0))
+            distance = np.linalg.norm(old_centre - centre) # How far the bot has moved
+            distance = max(distance, np.linalg.norm(front - old_front)) # How much has the bot rotated
+            old_centre = centre
+            old_front = front
+            current_time = round(time.time() * 1000)
+            if distance < TOL_STATIONARY and current_time > next_command_time: # if it isn't moving
+                print("Getting new command")
+                command, duration = go_to_coord_timed(centre, target, front)
+                duration *= 1000 # Turn s into ms
+                duration = int(duration)
+                getString = ip + "/TRIGGER/" + str(command[0]) + "/" + str(command[1]) + "//" + str(duration) + "/"
 
-            # update position estimate and failure counter
-            if USE_CROP:
-                if isValid:
-                    lastCentre = np.mean(bbox, axis=0).astype(int)
-                    track_fail_count = 0
-                else:
-                    track_fail_count += 1
-        else: # not found
-            cv2.putText(frame, "QR code not detected", (100, 200),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0, 0, 255), 2)
-            track_fail_count += 1
-        
-        # Get motor commands
-        # print(centre)
-        # print(front)
-        command = go_to_coord(centre, target, front, scale * GLOBAL_SCALE)
-        getString = ip + "/TRIGGER/" + str(command[0]) + "/" + str(command[1]) + "///"
-
-        # Calculate Frames per second (FPS)
-        fps = cv2.getTickFrequency() / (cv2.getTickCount() - timer)
-
-        # Display FPS on frame
-        cv2.putText(frame, "FPS : " + str(int(fps)), (100, 50),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.75, (50, 170, 50), 2)
-        # Display fails on frame
-        cv2.putText(frame, "fails : " + str(int(track_fail_count)), (100, 100),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.75, (50, 170, 50), 2)
-        # Display motor command and target
-        cv2.putText(frame, getString, (100, 150),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.75, (50, 170, 50), 2)
+            if lastString != getString:
+                urllib.request.urlopen(getString)
+                print("sending new command")
+                print(getString)
+                lastString = getString
+                next_command_time = current_time + MIN_COMMAND_INTERVAL
         cv2.circle(frame, target, 5, (255,255,0), -1)
-
-        # Send command
-        if lastString != getString:
-            # urllib.request.urlopen(getString)
-            print("sending new command")
-            lastString = getString
-        
-        # cv2.rectangle(frame, (1,1), (DIM[0] - 2, DIM[1] - 2), (0,0,255), 2)
         cv2.imshow("Tracking", frame)
         # cv2.imshow("Tracking", qrframe)
 
@@ -282,7 +234,130 @@ if __name__ == "__main__":
             break
         # If ENTER pressed, reset target
         if key == 13:
-            target = centre
+            target = np.int0(old_centre)
             print(target)
-            
+                
     cv2.destroyAllWindows()
+
+    ### OLD CODE - TODO delete all of this
+    # video = VideoCapture('http://localhost:8081/stream/video.mjpeg')
+    # qrDecoder = cv2.QRCodeDetector()
+    # lastCentre = np.zeros(2).astype(int)
+    # track_timeout = 5  # How many frames of consecutive tracking failure before resetting lastCentre
+    # track_fail_count = track_timeout # Always reset on first frame
+
+    # target = DIM // 2
+    # centre = DIM // 2
+    # front = np.array((100,100)).astype(int)
+    # print(front)
+    # getString = ip + "/"
+    # lastString = ""
+    # while True:
+    #     # Read a new frame
+    #     frame = video.read()
+    #     frame = cv2.resize(frame, DIM)
+    #     frame = undistort(frame, 0.4)
+    #     win = cv2.namedWindow("Tracking", cv2.WINDOW_NORMAL)
+
+    #     # print(frame.shape)
+    #     # Start timer
+    #     timer = cv2.getTickCount()
+
+    #     transform = [0,0] # Transformation from cropped coords to real coords
+    #     scale = 1
+    #     if USE_CROP:
+    #         # Crop and track QR code
+    #         if track_fail_count < track_timeout:
+    #             x_clipped = np.array([lastCentre[0] - CROP_RADIUS, lastCentre[0] + CROP_RADIUS]).astype(int)
+    #             y_clipped = np.array([lastCentre[1] - CROP_RADIUS, lastCentre[1] + CROP_RADIUS]).astype(int)
+    #             # Limit maximum x and y
+    #             x_clipped = np.clip(x_clipped, 0, DIM[0] - 1)
+    #             y_clipped = np.clip(y_clipped, 0, DIM[1] - 1)
+
+    #             qrframe = frame[y_clipped[0]:y_clipped[1],
+    #                             x_clipped[0]:x_clipped[1]]
+    #             transform = [x_clipped[0], y_clipped[0]]
+    #             crop_dim = np.array([x_clipped[1] - x_clipped[0], y_clipped[1] - y_clipped[0]]) * CROP_SCALE
+    #             crop_dim = np.int0(crop_dim)
+    #             scale = CROP_SCALE
+    #             qrframe = cv2.resize(qrframe, crop_dim)
+    #         else:
+    #             qrframe = frame
+    #         # Search for QR code in (potentially cropped) frame
+    #         found, bbox = qrDecoder.detect(qrframe)
+    #     else: # No cropping
+    #         found, bbox = qrDecoder.detect(frame)
+
+    #     if found:
+    #         bbox = bbox[0]  # bbox is always a unit length list, so just grab the first element
+    #         # now bbox is a list of 4 vertices relative to cropped coords, so transform them
+    #         for i in range(len(bbox)):
+    #             bbox[i] /= scale
+    #             bbox[i,0] += transform[0]
+    #             bbox[i,1] += transform[1]
+            
+    #         # check validity
+    #         shape_data = getQRShape(bbox)
+    #         # print(shape_data)
+    #         isValid = shape_data[0] < 20000 and shape_data[0] > 10000 and shape_data[1] > 0.98
+    #         # text_data = getQRData(frame, bbox, qrDecoder)
+    #         # isValid = text_data == "bit.ly/3tbqjqL"
+
+    #         # Draw blue border if valid, green otherwise.
+    #         if isValid:
+    #             centre, front = drawMarkers(frame, bbox, (255, 0, 0))
+    #         else:
+    #             drawMarkers(frame, bbox, (0, 255, 0))
+
+    #         # update position estimate and failure counter
+    #         if USE_CROP:
+    #             if isValid:
+    #                 lastCentre = np.mean(bbox, axis=0).astype(int)
+    #                 track_fail_count = 0
+    #             else:
+    #                 track_fail_count += 1
+    #     else: # not found
+    #         cv2.putText(frame, "QR code not detected", (100, 200),
+    #                     cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0, 0, 255), 2)
+    #         track_fail_count += 1
+        
+    #     # Get motor commands
+    #     # print(centre)
+    #     # print(front)
+    #     command = go_to_coord(centre, target, front, scale * GLOBAL_SCALE)
+    #     getString = ip + "/TRIGGER/" + str(command[0]) + "/" + str(command[1]) + "///"
+
+    #     # Calculate Frames per second (FPS)
+    #     fps = cv2.getTickFrequency() / (cv2.getTickCount() - timer)
+
+    #     # Display FPS on frame
+    #     cv2.putText(frame, "FPS : " + str(int(fps)), (100, 50),
+    #                 cv2.FONT_HERSHEY_SIMPLEX, 0.75, (50, 170, 50), 2)
+    #     # Display fails on frame
+    #     cv2.putText(frame, "fails : " + str(int(track_fail_count)), (100, 100),
+    #                 cv2.FONT_HERSHEY_SIMPLEX, 0.75, (50, 170, 50), 2)
+    #     # Display motor command and target
+    #     cv2.putText(frame, getString, (100, 150),
+    #                 cv2.FONT_HERSHEY_SIMPLEX, 0.75, (50, 170, 50), 2)
+    #     cv2.circle(frame, target, 5, (255,255,0), -1)
+
+    #     # Send command
+    #     if lastString != getString:
+    #         # urllib.request.urlopen(getString)
+    #         print("sending new command")
+    #         lastString = getString
+        
+    #     # cv2.rectangle(frame, (1,1), (DIM[0] - 2, DIM[1] - 2), (0,0,255), 2)
+    #     cv2.imshow("Tracking", frame)
+    #     # cv2.imshow("Tracking", qrframe)
+
+    #     key = cv2.waitKey(1) & 0xFF
+    #     # Exit if q pressed
+    #     if key == ord('q'):
+    #         break
+    #     # If ENTER pressed, reset target
+    #     if key == 13:
+    #         target = centre
+    #         print(target)
+            
+    # cv2.destroyAllWindows()
