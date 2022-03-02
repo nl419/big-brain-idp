@@ -97,15 +97,19 @@ def getDots(image: np.ndarray):
 
 
 if _DEBUG:
-    # Load in image
-    image = cv2.imread('qr_codes/dot6.jpg')
-    # Optionally undistort the image
+    # load image
+    image = cv2.imread('checkerboard2/3.jpg') # No dots - shouldn't find any
+    # image = cv2.imread('qr_codes/dot6.jpg') # Dots - should find them
+
+    # process image
     image = undistort(image)
     centres = getDots(image)
     print(centres)
     found, bbox = getDotBbox(centres)
     if found:
         drawMarkers(image, bbox, (255,0,0))
+    
+    # show image
     cv2.imshow('image', image)
     cv2.waitKey(0)
     cv2.destroyAllWindows()
