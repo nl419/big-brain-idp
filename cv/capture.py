@@ -6,6 +6,7 @@ folder = "qr_codes"
 
 print ("starting grab")
 cap = cv2.VideoCapture('http://localhost:8081/stream/video.mjpeg')
+prefix = "dot"
 counter = 1
 while True:
     ret, frame = cap.read()
@@ -14,7 +15,7 @@ while True:
     if key == ord('q'):
         break
     elif key == ord('w'):
-        cv2.imwrite(folder + "/" + str(counter) + ".jpg", frame)
+        cv2.imwrite(folder + "/" + prefix + str(counter) + ".jpg", frame)
         counter += 1
 cap.release()
 cv2.destroyAllWindows()
