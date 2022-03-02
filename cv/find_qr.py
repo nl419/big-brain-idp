@@ -111,8 +111,8 @@ class QRVideo:
     filename: str
     video: VideoCapture
     decoder = cv2.QRCodeDetector()
-    global_scale: float     # How much to scale the frame globally
-    crop_scale: float       # How much to additionally scale the frame after cropping
+    global_scale: float     # How much to scale the frame globally. 2 seems to work best.
+    crop_scale: float       # How much to additionally scale the frame after cropping. 1 seems to work best.
     crop_radius: int
 
     lastCentre = np.zeros(2).astype(int)
@@ -122,7 +122,7 @@ class QRVideo:
     target = lastCentre
     centre = lastCentre
     
-    def __init__(self, filename: str, global_scale: float = 1, crop_scale: float = 1, crop_radius: int = 150):
+    def __init__(self, filename: str, global_scale: float = 2, crop_scale: float = 1, crop_radius: int = 150):
         """QR Tracker class, designed to work on a video stream
 
         Parameters
@@ -130,7 +130,7 @@ class QRVideo:
         filename : str
             The filename (or http address) of the video stream
         global_scale : float, optional
-            How much to scale the image before finding the QR code, by default 1
+            How much to scale the image before finding the QR code, by default 2
         crop_scale : float, optional
             How much to scale the image after cropping, before finding the QR code, by default 1
         crop_radius : int, optional
@@ -168,7 +168,6 @@ class QRVideo:
         frame = self.video.read()
         OLDDIM = np.array([frame.shape[1], frame.shape[0]]).astype(int)
         DIM = OLDDIM * self.global_scale
-        print(DIM)
         frame = cv2.resize(frame, DIM)
         frame = undistort(frame, 0.4)
 
@@ -217,7 +216,9 @@ class QRVideo:
             
             # check validity
             shape_data = getQRShape(bbox)
-            isValid = shape_data[0] < 20000 and shape_data[0] > 10000 and shape_data[1] > 0.98
+            max_area = 5000 * (self.global_scale)**2
+            min_area = 2500 * (self.global_scale)**2
+            isValid = shape_data[0] < max_area and shape_data[0] > min_area and shape_data[1] > 0.98
             # text_data = getQRData(frame, bbox, qrDecoder)
             # isValid = text_data == "bit.ly/3tbqjqL"
 
@@ -252,7 +253,8 @@ class QRVideo:
 
         cv2.resize(frame, OLDDIM)
 
-        return frame, found and isValid, centre, front
+        return qrframe, found and isValid, centre, front
+        # return frame, found and isValid, centre, front
 
 def _find_decode_test():
     """Test the finding and/or decoding of a QR code
@@ -286,7 +288,7 @@ def _find_decode_test():
     cv2.destroyAllWindows()
 
 def _QRVideo_test():
-    finder = QRVideo('http://localhost:8081/stream/video.mjpeg', 2, 2)
+    finder = QRVideo('http://localhost:8081/stream/video.mjpeg', 2, 1)
     cv2.namedWindow("Tracking", cv2.WINDOW_NORMAL)
     while 1:
         frame, _, _, _ = finder.find()
