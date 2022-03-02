@@ -1,5 +1,4 @@
 import cv2
-from matplotlib.pyplot import contour
 import numpy as np
 from find_qr import drawMarkers
 from unfisheye import undistort
