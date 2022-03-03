@@ -90,7 +90,7 @@ def getDots(image: np.ndarray):
         M = cv2.moments(c)
         area = M['m00']
         _DEBUG and print(area)
-        if area > 250 and area < 550:
+        if area > 300 and area < 650:
             centre = (M['m10']/M['m00'], M['m01']/M['m00'])
             centre = np.array(centre)
             centres.append(centre)
@@ -100,7 +100,7 @@ def getDots(image: np.ndarray):
 def _testImage():
     # load image
     # image = cv2.imread('checkerboard2/3.jpg') # No dots - shouldn't find any
-    image = cv2.imread('dots/dot8.jpg') # Dots - should find them
+    image = cv2.imread('dots/dot12.jpg') # Dots - should find them
 
     # process image
     image = undistort(image)
@@ -195,5 +195,5 @@ class DotPatternVideo:
 
 
 if _DEBUG:
-    _testVideo()
-    # _testImage()
+    # _testVideo()
+    _testImage()
