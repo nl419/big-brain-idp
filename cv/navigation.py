@@ -2,7 +2,8 @@
 Reads video stream from idpcam2, finds robot location & orientation,
 calculates motor commands to arrive at target location.
 
-Reset target to robot centre with ENTER key."""
+With _test_go_to_target(), press ENTER to reset target to current location.
+With _test_go_loop(), watch it as it goes back and forth over the bridge!"""
 
 import numpy as np
 import cv2
@@ -121,7 +122,7 @@ def get_precise_rotation (orientation: np.ndarray, target_orientation: np.ndarra
         angle = np.arccos(dot)
     
     return rotation, angle / ROTATION_SPEED
-    
+
 def go_to_coord_timed (start: np.ndarray, end: np.ndarray, front: np.ndarray):
     turnThresh = 5 # degrees
     moveThresh = 5 # px
@@ -206,8 +207,8 @@ def go_to_coord (start: np.ndarray, end: np.ndarray, front: np.ndarray,
 
 ip = "http://192.168.137.43"
 
-SEND_COMMANDS = True # whether to attempt to send commands
-MIN_COMMAND_INTERVAL = 500
+SEND_COMMANDS = True # whether to attempt to send commands to the ip address
+MIN_COMMAND_INTERVAL = 500 # in ms
 
 def _test_go_to_target():
     #video = QRVideo('http://localhost:8081/stream/video.mjpeg', 0, 2.5)
