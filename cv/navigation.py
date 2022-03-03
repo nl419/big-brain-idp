@@ -6,6 +6,11 @@ Reset target to robot centre with ENTER key."""
 
 import numpy as np
 import cv2
+# For the example cases at bottom
+import urllib.request
+from find_qr import *
+from find_dots import DotPatternVideo
+import time
 
 
 FORWARD = np.array((-250,-255))
@@ -199,27 +204,10 @@ def go_to_coord (start: np.ndarray, end: np.ndarray, front: np.ndarray,
     return np.clip(command, -255, 255).astype(int)
 
 
-start = np.array((0,0))
-end = np.array((20,0))
-front = np.array((0.95,0.2))
-
-
-import urllib.request
 ip = "http://192.168.137.43"
-from laggy_video import VideoCapture
-from unfisheye import undistort
-from find_qr import *
-from find_dots import DotPatternVideo
-GLOBAL_SCALE = 2
-DIM = (np.array((1016, 760)) * GLOBAL_SCALE).astype(int)
-USE_CROP = True
-CROP_RADIUS = 200 # radius around last known point for cropping, used when TRACKER = False
-CROP_SCALE = 1.5
 
 SEND_COMMANDS = True # whether to attempt to send commands
 MIN_COMMAND_INTERVAL = 500
-
-import time
 
 def _test_go_to_target():
     #video = QRVideo('http://localhost:8081/stream/video.mjpeg', 0, 2.5)
@@ -273,16 +261,6 @@ def _test_go_to_target():
                 
     cv2.destroyAllWindows()
 
-LOCATION_PICKUP_BRIDGE = {"name": "Pickup", "coords": BRIDGE_POINTS[0]}
-LOCATION_DROPOFF_BRIDGE = {"name": "Dropoff", "coords": BRIDGE_POINTS[1]}
-LOCATION_HOME = {"name": "Home", "coords": BRIDGE_POINTS[1]}
-
-# If homing, go home, else...
-# Go to pickup side
-# Go to block
-# Go to dropoff side
-# Go to block dropoff
-
 def cross_bridge(centre: np.ndarray, front: np.ndarray, go_to_dropoff_side: bool = True):
     """Return the command and duration to go over the bridge
 
@@ -304,7 +282,7 @@ def cross_bridge(centre: np.ndarray, front: np.ndarray, go_to_dropoff_side: bool
     """
     
     # Return command, duration
-    DISTANCE_THRESH = 15
+    DISTANCE_THRESH = 30
     # get frame
     # get target side
     if go_to_dropoff_side:
@@ -358,9 +336,6 @@ def _test_go_loop():
         frame = draw_waypoints(frame)
         if found:
             back = centre - (front - centre)
-            # print(f"Front: {front}")
-            # print(f"Centre: {centre}")
-            # print(f"Back: {back}")
             # Make sure commands aren't sent while the bot is moving
             distance = np.linalg.norm(old_centre - centre)
             distance = max(distance, np.linalg.norm(front - old_front))
