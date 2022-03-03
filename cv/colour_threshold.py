@@ -9,7 +9,7 @@ def nothing(x):
     pass
 
 # Load in image
-image = cv2.imread('dots/dot7.jpg')
+image = cv2.imread('dots/dot12.jpg')
 # Optionally undistort the image
 from unfisheye import undistort
 image = undistort(image)
