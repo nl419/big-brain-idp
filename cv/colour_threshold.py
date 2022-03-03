@@ -9,7 +9,7 @@ def nothing(x):
     pass
 
 # Load in image
-image = cv2.imread('qr_codes/dot4.jpg')
+image = cv2.imread('dots/dot7.jpg')
 # Optionally undistort the image
 from unfisheye import undistort
 image = undistort(image)
