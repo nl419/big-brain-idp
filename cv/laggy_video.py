@@ -57,7 +57,7 @@ class VideoCapture:
 if __name__ == "__main__":
   cap = VideoCapture('http://localhost:8081/stream/video.mjpeg')
   while True:
-    time.sleep(.5)   # simulate time between events
+    time.sleep(.2)   # simulate time between events
     frame = cap.read()
     cv2.imshow("frame", frame)
     if chr(cv2.waitKey(1)&255) == 'q':
