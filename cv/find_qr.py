@@ -83,9 +83,9 @@ def drawMarkers(img: np.ndarray, points: "list[int]", lineColour: "list[int]"):
     Returns
     -------
     centre : np.ndarray 
-        Centre of bounding box
+        Centre of bounding box, to sub-pixel accuracay
     front : np.ndarray
-        Front of bounding box
+        Front of bounding box, to sub-pixel accuracy
     """
     x = points.astype(int)
     n = len(x)
@@ -94,14 +94,14 @@ def drawMarkers(img: np.ndarray, points: "list[int]", lineColour: "list[int]"):
         p2 = tuple(x[(j+1) % n])
         cv2.line(img, p1, p2, lineColour, 3)
 
-    centre = np.mean(x, axis=0).astype(int)
-    top_midpoint = np.mean(x[0:2], axis=0).astype(int)
+    centre = np.mean(points, axis=0)
+    top_midpoint = np.mean(points[0:2], axis=0)
     marker_radius = 5
-    cv2.circle(img, centre, radius=marker_radius,
+    cv2.circle(img, np.int0(centre), radius=marker_radius,
                color=(0, 0, 255), thickness=-1)
-    cv2.circle(img, top_midpoint, radius=marker_radius,
+    cv2.circle(img, np.int0(top_midpoint), radius=marker_radius,
                color=(0, 0, 255), thickness=-1)
-    cv2.line(img, centre, top_midpoint, color=(0, 0, 255), thickness=3)
+    cv2.line(img, np.int0(centre), np.int0(top_midpoint), color=(0, 0, 255), thickness=3)
     return centre, top_midpoint
 
 from laggy_video import VideoCapture
