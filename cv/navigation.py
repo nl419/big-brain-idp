@@ -493,7 +493,7 @@ STUCK_COMMANDS = (
 # Threshold time in ms for a stationary robot to be "stuck"
 STUCK_TIMEOUT = 2000
 
-# Keep crossing the bridge in a loop
+# Keep crossing the bridge repeatedly
 def _test_go_loop():
     #video = QRVideo('http://localhost:8081/stream/video.mjpeg', 0, 2.5)
     video = DotPatternVideo('http://localhost:8081/stream/video.mjpeg')
@@ -528,7 +528,8 @@ def _test_go_loop():
             if distance > TOL_STATIONARY:
                 stuck_time = current_time + STUCK_TIMEOUT
             else:
-                # If stopped, but shouldn't be stopped
+                # If stopped, but shouldn't be stopped, you're stuck.
+                # Elif the command timeout has expired, find a command.
                 if current_time > stuck_time and "/TRIGGER/0/0" not in lastString:
                     print("Stuck detected.")
                     command, duration = STUCK_COMMANDS[stuck_counter]
