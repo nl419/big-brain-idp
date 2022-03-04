@@ -98,6 +98,30 @@ def getDots(image: np.ndarray):
     return centres
 
 def transform_coords(x: np.ndarray, centre: np.ndarray, front: np.ndarray):
+    """Transform coordinates into the local coordinate system of the robot
+
+    Examples:
+    All inputs should be numpy arrays, but are written as tuples for convenience
+    >>> transform_coords((1,0), (0,0), (1,0))
+    (1, 0)
+    >>> transform_coords((1,0), (0,0), (1,1))
+    (0.5, -0.5)
+
+    Parameters
+    ----------
+    x : np.ndarray
+        The coordinates to transform
+    centre : np.ndarray
+        Coordinates (x,y) of the centre of the robot
+    front : np.ndarray
+        Coordinates (x,y) of the front of the robot
+
+    Returns
+    -------
+    np.ndarray
+        The transformed coordinates
+    """
+    
     # Take an input coordinate, plus the centre & front coordinates,
     # return the coordinate in the robot's frame of reference
     dx = x - centre
@@ -107,9 +131,9 @@ def transform_coords(x: np.ndarray, centre: np.ndarray, front: np.ndarray):
     return np.matmul(mat, dx)
 
 def _test_transform():
-    x = np.array([2,1])
-    c = np.array([1,1])
-    f = np.array([3,1])
+    x = np.array([1,0])
+    c = np.array([0,0])
+    f = np.array([1,1])
     result = transform_coords(x,c,f)
     print(result)
 
