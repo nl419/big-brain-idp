@@ -159,11 +159,14 @@ def untransform_coords(x: np.ndarray, centre: np.ndarray, front: np.ndarray):
     return np.matmul(mat, x) + centre
 
 def get_CofR(centre: np.ndarray, front: np.ndarray):
-    COFR_TRANSFORMED = np.array((-0.74257382, -0.13944251))
+    COFR_TRANSFORMED = np.array((0, -1))
+    # COFR_TRANSFORMED = np.array((-0.74257382, -0.13944251))
     return untransform_coords(COFR_TRANSFORMED, centre, front)
 
 def get_true_front(centre: np.ndarray, front:np.ndarray):
-    TRUE_FRONT_TRANSFORMED = np.array((3.31095469, 0.02314122))
+    TRUE_FRONT_TRANSFORMED = np.array((1, 0))
+    # TRUE_FRONT_TRANSFORMED = np.array((3.31095469, 0.02314122))
+    
     return untransform_coords(TRUE_FRONT_TRANSFORMED, centre, front)
 
 def _test_transform():
@@ -207,6 +210,53 @@ def _test_video():
             break
     cv2.destroyAllWindows()
     
+# return 2D vector perpendicular to input
+def perp(a: np.ndarray):
+    """Return a 2D vector which is perpendicular to the input
+
+    Parameters
+    ----------
+    a : np.ndarray
+        Input vector
+
+    Returns
+    -------
+    np.ndarray
+        A vector perpendicular to the input, in the cw direction
+        if in a left-handed coordinate system (i.e. with OpenCV)
+    """
+    b = np.empty_like(a)
+    b[0] = -a[1]
+    b[1] = a[0]
+    return b
+
+def angle(vec1: np.ndarray, vec2: np.ndarray):
+    """Return the signed angle between two vectors between -pi and pi,
+    in left-handed coordinates (which is what OpenCV uses)
+
+    Parameters
+    ----------
+    vec1 : np.ndarray
+        The starting vector
+    vec2 : np.ndarray
+        The final vector
+
+    Returns
+    -------
+    float
+        Angle of rotation of vec2 from vec1 in ccw direction 
+        (i.e. +ve => vec2 is ccw from vec1)
+    """
+    # Angle between two vectors (in left handed coordinates)
+    # +ve = vec2 is ccw from vec1, -ve = vec2 is cw from vec1
+    mag_vec1 = np.linalg.norm(vec1)
+    mag_vec2 = np.linalg.norm(vec2)
+    dot = np.dot(vec1, vec2) / mag_vec1 / mag_vec2
+    cross = np.cross(vec1, vec2)
+    angle = np.arccos(np.clip(dot, -1, 1))
+    if cross > 0:
+        angle = -angle
+    return angle
 
 class DotPatternVideo:
     filename: str

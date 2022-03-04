@@ -236,12 +236,6 @@ def go_to_coord (start: np.ndarray, end: np.ndarray, front: np.ndarray,
     if doMove: command += translation
     return np.clip(command, -255, 255).astype(int)
 
-# return 2D vector perpendicular to input
-def perp(a):
-    b = np.empty_like(a)
-    b[0] = -a[1]
-    b[1] = a[0]
-    return b
 
 def centre_of_rotation (a0: np.ndarray, b0: np.ndarray, a1: np.ndarray, b1: np.ndarray):
     """Returns the centre of rotation for a pair of initial and final coords
