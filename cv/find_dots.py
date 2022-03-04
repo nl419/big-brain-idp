@@ -97,7 +97,23 @@ def getDots(image: np.ndarray):
             areas.append(area)
     return centres
 
-def _testImage():
+def transform_coords(x: np.ndarray, centre: np.ndarray, front: np.ndarray):
+    # Take an input coordinate, plus the centre & front coordinates,
+    # return the coordinate in the robot's frame of reference
+    dx = x - centre
+    df = front - centre
+    # Transformation matrix of df to unit length x axis
+    mat = np.array(((df[0], df[1]), (-df[1], df[0]))) / np.linalg.norm(df)**2
+    return np.matmul(mat, dx)
+
+def _test_transform():
+    x = np.array([2,1])
+    c = np.array([1,1])
+    f = np.array([3,1])
+    result = transform_coords(x,c,f)
+    print(result)
+
+def _test_image():
     # load image
     # image = cv2.imread('checkerboard2/3.jpg') # No dots - shouldn't find any
     image = cv2.imread('dots/dot12.jpg') # Dots - should find them
@@ -115,7 +131,7 @@ def _testImage():
     cv2.waitKey(0)
     cv2.destroyAllWindows()
 
-def _testVideo():
+def _test_video():
     #video = VideoCapture('http://localhost:8081/stream/video.mjpeg')
     video = DotPatternVideo('http://localhost:8081/stream/video.mjpeg')
 
@@ -194,5 +210,6 @@ class DotPatternVideo:
 
 
 if _DEBUG:
-    # _testVideo()
-    _testImage()
+    _test_transform()
+    # _test_video()
+    # _test_image()
