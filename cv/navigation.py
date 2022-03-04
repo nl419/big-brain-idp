@@ -490,6 +490,8 @@ STUCK_COMMANDS = (
     (RIGHT, 2)
 )
 
+STUCK_TIMEOUT = 2000
+
 # Keep crossing the bridge in a loop
 def _test_go_loop():
     #video = QRVideo('http://localhost:8081/stream/video.mjpeg', 0, 2.5)
@@ -498,13 +500,14 @@ def _test_go_loop():
     old_centre = np.array([100,100])
     old_front = np.array([200,200])
     TOL_STATIONARY = 1
-    stuck_counter = 0
 
     getString = ip + "/"
     lastString = ""
     next_command_time = 0
-    stuck_time = 1000
     go_to_dropoff_side = True
+    
+    stuck_time = 10000
+    stuck_counter = 0
 
     while True:
         frame, found, centre, front = video.find()
@@ -520,7 +523,9 @@ def _test_go_loop():
             # Make sure commands aren't sent too rapidly
             current_time = round(time.time() * 1000)
 
-            if distance < TOL_STATIONARY and current_time > next_command_time:
+            if distance > TOL_STATIONARY:
+                stuck_time = current_time + STUCK_TIMEOUT
+            elif current_time > next_command_time:
                 # Get command, duration
                 if current_time > stuck_time:
                     print("Stuck detected.")
@@ -556,7 +561,7 @@ def _test_go_loop():
                 print(getString)
                 lastString = getString
                 next_command_time = current_time + MIN_COMMAND_INTERVAL
-                stuck_time = current_time + duration + MIN_COMMAND_INTERVAL * 2
+                stuck_time = current_time + STUCK_TIMEOUT
             cv2.circle(frame, np.int0(back), 5, (255,255,0),-1)
         cv2.imshow("Tracking", frame)
 
