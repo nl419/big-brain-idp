@@ -30,6 +30,8 @@ The changes are now synced with the online repo! See https://github.com/nl419/bi
 
 ## TODO list
 
+Software:
+
 - [x] Redo checkerboard calibration
 - [x] Track orientation
 - [x] Make tracking robust vs lighting changes
@@ -38,3 +40,13 @@ The changes are now synced with the online repo! See https://github.com/nl419/bi
 - [x] Navigation code
 - [x] Arduino WiFi code
 - [x] Laptop WiFi code
+
+Electrical:
+
+- [ ] LED display
+- [ ] Colour detector
+
+Mechanical:
+
+- [ ] Final chassis
+- [ ] Block shover
