@@ -174,7 +174,6 @@ class DotPatternVideo:
         found, bbox = getDotBbox(getDots(frame))
         centre = None
         front = None
-        isValid = False
         if found:
             centre, front = drawMarkers(frame, bbox, (255, 0, 0))
         else: # not found
