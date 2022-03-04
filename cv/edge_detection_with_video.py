@@ -1,10 +1,14 @@
 import cv2
+import numpy as np
+from unfisheye import undistort
+
+
 print ("starting grab")
 cap = cv2.VideoCapture('http://localhost:8081/stream/video.mjpeg')
 while True:
     #capture image
     ret, frame = cap.read()
-    
+    frame = undistort(frame)
 
     #edge detection
     img_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)

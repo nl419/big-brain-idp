@@ -4,15 +4,21 @@
 import cv2
 import sys
 import numpy as np
+from unfisheye import undistort
 
 def nothing(x):
     pass
 
 # Load in image
-image = cv2.imread('cv/2.jpg')
+image = cv2.imread('cv/block.jpg')
+_img_shape = image.shape[:2]
+DIM = _img_shape[::-1]
+image = cv2.resize(image, DIM)
+image = undistort(image, )
 
 # Create a window
-cv2.namedWindow('image')
+win = cv2.namedWindow('image', cv2.WINDOW_NORMAL)
+cv2.resizeWindow('image', DIM[0] // 2, DIM[1] // 2)
 
 # create trackbars for color change
 cv2.createTrackbar('HMin','image',0,179,nothing) # Hue is from 0-179 for Opencv

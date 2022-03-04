@@ -1,11 +1,13 @@
 import cv2
+from cv2 import undistort
 print ("starting grab")
 
 #testing edge detection with an image
 while True:
     #apply edge detection
-    img = cv2.imread('1.jpg')
-    img = cv2.resize(img, (1000, 700))
+    img = cv2.imread('cv/block.jpg')
+    img = cv2.resize(img, (1500, 700))
+    #img = undistort(img)
     #cv2.imshow('Original', img)
     cv2.waitKey(0)
     # Convert to graycsale
@@ -33,5 +35,5 @@ while True:
 
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
-cap.release()
+#cap.release()
 cv2.destroyAllWindows()
