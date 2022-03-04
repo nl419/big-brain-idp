@@ -490,6 +490,7 @@ STUCK_COMMANDS = (
     (RIGHT, 2)
 )
 
+# Threshold time in ms for a stationary robot to be "stuck"
 STUCK_TIMEOUT = 2000
 
 # Keep crossing the bridge in a loop
@@ -499,14 +500,14 @@ def _test_go_loop():
     cv2.namedWindow("Tracking", cv2.WINDOW_NORMAL)
     old_centre = np.array([100,100])
     old_front = np.array([200,200])
-    TOL_STATIONARY = 1
+    TOL_STATIONARY = 2
 
     getString = ip + "/"
-    lastString = ""
+    lastString = ip + "/TRIGGER/0/0///"
     next_command_time = 0
     go_to_dropoff_side = True
     
-    stuck_time = 10000
+    stuck_time = round(time.time() * 1000) + 10000
     stuck_counter = 0
 
     while True:
@@ -523,36 +524,34 @@ def _test_go_loop():
             # Make sure commands aren't sent too rapidly
             current_time = round(time.time() * 1000)
 
+            # If moving, reset stuck time
             if distance > TOL_STATIONARY:
                 stuck_time = current_time + STUCK_TIMEOUT
-            elif current_time > next_command_time:
-                # Get command, duration
-                if current_time > stuck_time:
+            else:
+                # If stopped, but shouldn't be stopped
+                if current_time > stuck_time and "/TRIGGER/0/0" not in lastString:
                     print("Stuck detected.")
                     command, duration = STUCK_COMMANDS[stuck_counter]
                     stuck_counter = (stuck_counter + 1) % len(STUCK_COMMANDS)
-                else:
+                elif current_time > next_command_time:
                     command, duration = cross_bridge(back, front, go_to_dropoff_side)
                     if command is None:
                         go_to_dropoff_side = not go_to_dropoff_side
                         command, duration = cross_bridge(centre, front, go_to_dropoff_side)
-                if abs(command[0]) < STALL_SPEED and abs(command[1]) < STALL_SPEED:
-                    print("Attempted to send a stall command.")
-                    stuck_time = current_time + 1e6
-                
-                # Turn that into a getString
-                duration *= 1000 # Turn s into ms
-                if math.isnan(duration): 
-                    # If nan, just give up, and pray the next frame is ok.
-                    # This should never happen!
-                    print("==============================")
-                    print("DURATION WAS NAN, MUST FIX NOW")
-                    print("==============================")
-                    print(f"command: {command}")
-                    time.sleep(5)
-                    continue
-                duration = int(duration)
-                getString = ip + "/TRIGGER/" + str(command[0]) + "/" + str(command[1]) + "//" + str(duration) + "/"
+                if command is not None:
+                    # Turn that into a getString
+                    duration *= 1000 # Turn s into ms
+                    if math.isnan(duration): 
+                        # If nan, just give up, and pray the next frame is ok.
+                        # This should never happen!
+                        print("==============================")
+                        print("DURATION WAS NAN, MUST FIX NOW")
+                        print("==============================")
+                        print(f"command: {command}")
+                        time.sleep(5)
+                        continue
+                    duration = int(duration)
+                    getString = ip + "/TRIGGER/" + str(command[0]) + "/" + str(command[1]) + "//" + str(duration) + "/"
 
             # Don't send duplicate commands
             if lastString != getString:
