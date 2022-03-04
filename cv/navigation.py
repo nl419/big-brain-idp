@@ -5,12 +5,13 @@ calculates motor commands to arrive at target location.
 With _test_go_to_target(), press ENTER to reset target to current location.
 With _test_go_loop(), watch it as it goes back and forth over the bridge!"""
 
+from matplotlib.style import use
 import numpy as np
 import cv2
 # For the example cases at bottom
 import urllib.request
 from find_qr import *
-from find_dots import DotPatternVideo
+from find_dots import *
 import time
 import math
 
@@ -125,25 +126,27 @@ def get_precise_rotation (orientation: np.ndarray, target_orientation: np.ndarra
     
     return rotation, angle / ROTATION_SPEED
 
-def go_to_coord_timed (start: np.ndarray, end: np.ndarray, front: np.ndarray,
+def go_to_coord_timed (centre: np.ndarray, end: np.ndarray, front: np.ndarray,
                        backwardOk: bool = True, dist_thresh: float = 5, 
-                       angle_thresh: float = 5):
+                       angle_thresh: float = 5, use_calibration: bool = True):
     """Return the command and duration to go to end
 
     Parameters
     ----------
-    start : np.ndarray
-        Coordinates (x,y) of the start point
+    centre : np.ndarray
+        Coordinates (x,y) of the centre of the robot
     end : np.ndarray
         Coordinates (x,y) of the end point
     front : np.ndarray
-        Coordinates (x,y) of the front of the robot (orientation = front - start)
+        Coordinates (x,y) of the front of the robot (orientation = front - centre)
     backwardOk : bool, optional
         Whether reversing is ok, by default True
     dist_thresh : float, optional
         Distance threshold for being "at" end, by default 5
     angle_thresh : float, optional
         Angle threshold for being "at" target orientation in degrees, by default 5
+    use_calibration : bool, optional
+        If true, use calibrated values for the centre of rotation, by default True
 
     Returns
     -------
@@ -152,11 +155,17 @@ def go_to_coord_timed (start: np.ndarray, end: np.ndarray, front: np.ndarray,
     time : float
         The duration of time for the command to be run in seconds
     """
-
-    orientation = front - start
-    displacement = end - start
-    orient_mag = np.linalg.norm(orientation)
-    dot = np.dot(orientation, displacement) / orient_mag
+    
+    if use_calibration:
+        orientation = get_true_front(centre, front) - centre
+        displacement = end - get_CofR(centre, front)
+        orient_mag = np.linalg.norm(orientation)
+        dot = np.dot(orientation, displacement) / orient_mag
+    else:
+        orientation = front - centre
+        displacement = end - centre
+        orient_mag = np.linalg.norm(orientation)
+        dot = np.dot(orientation, displacement) / orient_mag
     # Try to rotate first, then try translation, then give up.
     command, duration = get_precise_rotation(orientation, displacement, backwardOk, angle_thresh)
     if command is None:
@@ -227,6 +236,13 @@ def go_to_coord (start: np.ndarray, end: np.ndarray, front: np.ndarray,
     if doMove: command += translation
     return np.clip(command, -255, 255).astype(int)
 
+# return 2D vector perpendicular to input
+def perp(a):
+    b = np.empty_like(a)
+    b[0] = -a[1]
+    b[1] = a[0]
+    return b
+
 def centre_of_rotation (a0: np.ndarray, b0: np.ndarray, a1: np.ndarray, b1: np.ndarray):
     """Returns the centre of rotation for a pair of initial and final coords
     for two points
@@ -255,12 +271,6 @@ def centre_of_rotation (a0: np.ndarray, b0: np.ndarray, a1: np.ndarray, b1: np.n
     """
     
     # https://stackoverflow.com/questions/3252194/numpy-and-line-intersections
-    # return 2D vector perpendicular to input
-    def perp(a):
-        b = np.empty_like(a)
-        b[0] = -a[1]
-        b[1] = a[0]
-        return b
 
     # return intersections of line segments a and b, each defined with 2 points
     def seg_intersect(w1,w2, v1,v2) :
@@ -270,7 +280,7 @@ def centre_of_rotation (a0: np.ndarray, b0: np.ndarray, a1: np.ndarray, b1: np.n
         dwp = perp(dw)
         denom = np.dot(dwp, dv)
         num = np.dot(dwp, dp)
-        return (num / denom.astype(float))*dv + b1
+        return (num / denom.astype(float))*dv + v1
     
     # Tolerance for a "zero" length vector
     LENGTH_TOL = 1e-2
@@ -278,11 +288,26 @@ def centre_of_rotation (a0: np.ndarray, b0: np.ndarray, a1: np.ndarray, b1: np.n
     da = a1 - a0
     db = b1 - b0
 
+    print(f"da {da}")
+    print(f"db {db}")
+
     # Get points defining the line perpendicular to each of da and db
     ahalf = (a0 + a1) / 2
     aperp = ahalf + perp(da)
     bhalf = (b0 + b1) / 2
     bperp = bhalf + perp(db)
+
+    print(f"ahalf {ahalf}")
+    print(f"bhalf {bhalf}")
+    print(f"aperp {aperp}")
+    print(f"bperp {bperp}")
+    
+    test_0_0 = np.array((1,-1))
+    test_0_1 = np.array((1,1))
+    test_1_0 = np.array((-1,0.5))
+    test_1_1 = np.array((2,0.5))
+    test_result = seg_intersect(test_0_0, test_0_1, test_1_0, test_1_1)
+    print(f"test_result {test_result}")
 
     # handle edge cases of zero length
     if np.linalg.norm(da) < LENGTH_TOL:
@@ -294,38 +319,16 @@ def centre_of_rotation (a0: np.ndarray, b0: np.ndarray, a1: np.ndarray, b1: np.n
     
     return c
 
-# If I know the centre of rotation for a few different moves,
-# Then I can plot a curved course, and reach a particular destination & orientation simultaneously.
-# So I need to measure a few centres of rotation for different moves
-# Then lerp between them.
-# Could do the same measurements for movement speed
-
-# To plot curved course: 
-    # Get current location (of robot's own centre of rotation), 
-    # current orientation, target location.
-    # lines = (cloc - corient, cloc + corient), (cloc, tloc)
-    # c = get centre of rotation for lines
-    # vecs = (middle(line0) - c, middle(line1) - c)
-    # angle = signed angle between vecs
-
-# This is much too complicated, for only minor improvements.
-# The main issue, is if the robot wants to get to a certain place & orientation,
-# But it misses the place slightly, then it will make a big turn to get there,
-# then have to turn around again to match the desired orientation.
-
-# Instead, should match orientation, reverse a little bit, 
-# make a smaller turn to the place, go to place,
-# then make a small turn to correct orientation.
-
-def go_to_coord_orient (start: np.ndarray, end: np.ndarray, front: np.ndarray, 
+def go_to_coord_orient (centre: np.ndarray, end: np.ndarray, front: np.ndarray, 
                         target_orient : np.ndarray, at_thresh: float = 3,
-                        near_thresh: float = 20, angle_thresh: float = 3):
+                        near_thresh: float = 20, angle_thresh: float = 3,
+                        use_calibration: bool = True):
     """Return the command and duration to go to end and align with target_orient
 
     Parameters
     ----------
-    start : np.ndarray
-        Coordinates (x,y) of the start point
+    centre : np.ndarray
+        Coordinates (x,y) of the centre of the robot
     end : np.ndarray
         Coordinates (x,y) of the end point
     front : np.ndarray
@@ -338,6 +341,8 @@ def go_to_coord_orient (start: np.ndarray, end: np.ndarray, front: np.ndarray,
         Distance threshold for "near" end, by default 20
     angle_thresh : float, optional
         Angle threshold for "at" target orientation in degrees, by default 3
+    use_calibration : bool, optional
+        If true, use calibrated values for the centre of rotation, by default True
 
     Returns
     -------
@@ -353,28 +358,39 @@ def go_to_coord_orient (start: np.ndarray, end: np.ndarray, front: np.ndarray,
         # align to target_orient, then reverse for 0.5s
     # If far from end, align / drive to end
 
-    disp = end - start
-    orient = front - start
-    mag_orient = np.linalg.norm(orient)
-    assert mag_orient > 4, "Front must be at least 4px away from start."
-    mag_disp = np.linalg.norm(disp)
+    if use_calibration:
+        disp = end - get_CofR(centre, front)
+        orient = get_true_front(centre, front) - centre
+        mag_orient = np.linalg.norm(orient)
+        assert mag_orient > 4, "Front must be at least 4px away from centre."
+        mag_disp = np.linalg.norm(disp)
+    else:
+        disp = end - centre
+        orient = front - centre
+        mag_orient = np.linalg.norm(orient)
+        assert mag_orient > 4, "Front must be at least 4px away from centre."
+        mag_disp = np.linalg.norm(disp)
 
     if mag_disp < at_thresh:
+        print("at")
         return get_precise_rotation(orient, target_orient, False, angle_thresh)
     if mag_disp < near_thresh:
+        print("near")
         command, duration = get_precise_rotation(orient, target_orient, False, angle_thresh)
         if command is None:
+            print("Reversing")
             return BACKWARD, 0.5
         return command, duration
+    print("neither")
     command, duration = get_precise_rotation(orient, disp, False, angle_thresh)
     if command is None:
         return get_precise_translation(mag_disp)
     return command, duration
 
-ip = "http://192.168.137.43"
+ip = "http://192.168.137.198"
 
 SEND_COMMANDS = True # whether to attempt to send commands to the ip address
-MIN_COMMAND_INTERVAL = 500 # in ms
+MIN_COMMAND_INTERVAL = 1000 # in ms
 
 def _test_go_to_target():
     #video = QRVideo('http://localhost:8081/stream/video.mjpeg', 0, 2.5)
@@ -428,7 +444,8 @@ def _test_go_to_target():
                 
     cv2.destroyAllWindows()
 
-def cross_bridge(centre: np.ndarray, front: np.ndarray, go_to_dropoff_side: bool = True):
+def cross_bridge(centre: np.ndarray, front: np.ndarray, go_to_dropoff_side: bool = True,
+                 use_calibration: bool = True):
     """Return the command and duration to go over the bridge
 
     Parameters
@@ -439,6 +456,8 @@ def cross_bridge(centre: np.ndarray, front: np.ndarray, go_to_dropoff_side: bool
         Coordinates (x,y) of the front of the robot
     go_to_dropoff_side : bool, optional
         If true, go to dropoff, else go to pickup, by default True
+    use_calibration : bool, optional
+        If true, use calibrated values for the centre of rotation, by default True
 
     Returns
     -------
@@ -459,23 +478,33 @@ def cross_bridge(centre: np.ndarray, front: np.ndarray, go_to_dropoff_side: bool
     else:
         target = BRIDGE_POINTS[0]
         not_target = BRIDGE_POINTS[1]
-    print(target)
+    # print(target)
 
+    if use_calibration:
+        target_disp = target - get_CofR(centre, front)
+        not_target_disp = not_target - get_CofR(centre, front)
+        target_dist = np.linalg.norm(target_disp)
+        not_target_dist = np.linalg.norm(not_target_disp)
+    else:
+        target_disp = target - centre
+        not_target_disp = not_target - centre
+        target_dist = np.linalg.norm(target_disp)
+        not_target_dist = np.linalg.norm(not_target_disp)
     # If at target, return nothing
     # If closer to target side or at non-target side, align / go to target side
     # Else align / go to non-target side
-    target_disp = target - centre
-    not_target_disp = not_target - centre
-    target_dist = np.linalg.norm(target_disp)
-    not_target_dist = np.linalg.norm(not_target_disp)
+    print(f"Target {target}")
     if target_dist < TARGET_THRESH:
         print("We're here")
         return None, 0
     if target_dist < not_target_dist:
+        print("Closer to target")
         return go_to_coord_timed(centre, target, front)
     if not_target_dist < NOT_TARGET_THRESH:
+        print("At not target")
         return go_to_coord_timed(centre, target, front, False, TARGET_THRESH, 2)
-    return go_to_coord_orient(centre, not_target, front, target_disp, NOT_TARGET_THRESH, angle_thresh=2)
+    print("Going to not target")
+    return go_to_coord_orient(centre, not_target, front, target_disp, NOT_TARGET_THRESH, 50, angle_thresh=2)
 
 # Commands to try if the robot gets stuck
 STUCK_COMMANDS = (
@@ -491,7 +520,7 @@ STUCK_COMMANDS = (
 )
 
 # Threshold time in ms for a stationary robot to be "stuck"
-STUCK_TIMEOUT = 2000
+STUCK_TIMEOUT = 5000
 
 # Keep crossing the bridge repeatedly
 def _test_go_loop():
@@ -500,21 +529,27 @@ def _test_go_loop():
     cv2.namedWindow("Tracking", cv2.WINDOW_NORMAL)
     old_centre = np.array([100,100])
     old_front = np.array([200,200])
-    TOL_STATIONARY = 2
+    TOL_STATIONARY = 3
 
-    getString = ip + "/"
-    lastString = ip + "/TRIGGER/0/0///"
-    next_command_time = 0
+    getString = ip + "/TRIGGER/0/0///"
+    lastString = getString
+    command = (0,0)
+    duration = 0
+    lastCommand = command
+    # Time at which we will send a new command to the robot
+    next_command_time = round(time.time() * 1000) + 3000
     go_to_dropoff_side = True
     
-    stuck_time = round(time.time() * 1000) + 10000
-    stuck_counter = 0
+    # Time at which the robot will think it's stuck if no movement detected
+    stuck_time = round(time.time() * 1000) + 4000
+    not_stuck_pos = old_centre # The last position at which stuck = False
+    stuck_counter = 0 # The number of times the robot has been stuck
+    stuck = False # Whether it is currently stuck
 
     while True:
         frame, found, centre, front = video.find()
         frame = draw_waypoints(frame)
         if found:
-            back = centre - (front - centre)
             # Make sure commands aren't sent while the bot is moving
             distance = np.linalg.norm(old_centre - centre)
             distance = max(distance, np.linalg.norm(front - old_front))
@@ -524,22 +559,40 @@ def _test_go_loop():
             # Make sure commands aren't sent too rapidly
             current_time = round(time.time() * 1000)
 
-            # If moving, reset stuck time
-            if distance > TOL_STATIONARY:
+            # If the robot isn't supposed to move, then stuck = false
+            # If the robot has moved from its last non-stuck position
+                # stuck = false
+            # If it has been 5s since a non-zero command was sent,
+            # and the robot hasn't moved far away from its last non-stuck position
+                # stuck = true
+            if lastCommand[0] == 0 and lastCommand[1] == 0:
+                print("Not supposed to move")
+                stuck = False
+                not_stuck_pos = centre
                 stuck_time = current_time + STUCK_TIMEOUT
-            else:
-                # If stopped, but shouldn't be stopped, you're stuck.
-                # Elif the command timeout has expired, find a command.
-                if current_time > stuck_time and "/TRIGGER/0/0" not in lastString:
-                    print("Stuck detected.")
+            elif np.linalg.norm(centre - not_stuck_pos) > 10:
+                print("Stuckn't")
+                stuck = False
+                not_stuck_pos = centre
+                stuck_time = current_time + STUCK_TIMEOUT
+            elif current_time > stuck_time:
+                print("Stuck detected")
+                stuck = True
+            
+            if current_time > next_command_time:
+                # Reset command to None
+                command = None
+                if stuck:
+                    print("Getting stuck command")
                     command, duration = STUCK_COMMANDS[stuck_counter]
                     stuck_counter = (stuck_counter + 1) % len(STUCK_COMMANDS)
-                elif current_time > next_command_time:
-                    command, duration = cross_bridge(back, front, go_to_dropoff_side)
+                elif distance < TOL_STATIONARY:
+                    print("Getting normal command")
+                    command, duration = cross_bridge(centre, front, go_to_dropoff_side)
                     if command is None:
                         go_to_dropoff_side = not go_to_dropoff_side
                         command, duration = cross_bridge(centre, front, go_to_dropoff_side)
-                if command is not None:
+                if command is not None and duration > 0.005:
                     # Turn that into a getString
                     duration *= 1000 # Turn s into ms
                     if math.isnan(duration): 
@@ -554,15 +607,13 @@ def _test_go_loop():
                     duration = int(duration)
                     getString = ip + "/TRIGGER/" + str(command[0]) + "/" + str(command[1]) + "//" + str(duration) + "/"
 
-            # Don't send duplicate commands
-            if lastString != getString:
-                SEND_COMMANDS and urllib.request.urlopen(getString)
-                print("sending new command")
-                print(getString)
-                lastString = getString
-                next_command_time = current_time + MIN_COMMAND_INTERVAL
-                stuck_time = current_time + STUCK_TIMEOUT
-            cv2.circle(frame, np.int0(back), 5, (255,255,0),-1)
+                    SEND_COMMANDS and urllib.request.urlopen(getString)
+                    print("sending new command")
+                    print(getString)
+                    next_command_time = current_time + duration + MIN_COMMAND_INTERVAL
+                    lastCommand = command
+                    lastString = getString
+            cv2.circle(frame, np.int0(get_CofR(centre, front)), 5, (255,255,0),-1)
         cv2.imshow("Tracking", frame)
 
         key = cv2.waitKey(1) & 0xFF
@@ -572,10 +623,107 @@ def _test_go_loop():
      
     cv2.destroyAllWindows()
 
+CALIBRATION_COMMANDS = (
+    (LEFT, 5),
+    (FORWARD, 2)
+)
+
 # Calibrate the forward direction and the centre of rotation
+# Command 1: LEFT, 5
+    # Find CofR from how the front + centre moved.
+# Command 2: FORWARD, 2
+    # Find forward direction from how the CofR moved
 def _test_calibrate():
-    return 0
+    #video = QRVideo('http://localhost:8081/stream/video.mjpeg', 0, 2.5)
+    video = DotPatternVideo('http://localhost:8081/stream/video.mjpeg')
+    cv2.namedWindow("Tracking", cv2.WINDOW_NORMAL)
+    old_centre = np.array([100,100])
+    old_front = np.array([200,200])
+    start_centre = old_centre
+    start_front = old_front
+    CofR = old_centre
+    TOL_STATIONARY = 2
+
+    getString = ip + "/"
+    lastString = ip + "/TRIGGER/0/0///"
+    current_time = round(time.time() * 1000)
+    next_command_time = round(time.time() * 1000) + 5000
+    duration = 0
+
+    calibration_mode = 0 # 0 = rotation, 1 = translation
+    calibration = {
+        # In the local coordinate system of the robot,
+        # where is the CofR, and where is the true front?
+        # (robot moves forward in the "true_front" - "centre" direction)
+        "CofR": (0,0),      # [-0.87290985, -0.34059074] [-0.74257382 -0.13944251] [-0.74846031 -0.11834294]
+        "true_front": (1,0) # [3.31095469 0.02314122] [3.299921   0.00386202]
+    }
+
+    while True:
+        # TODO actually use the calibration
+        frame, found, centre, front = video.find()
+        if found:
+            # Make sure commands aren't sent while the bot is moving
+            distance = np.linalg.norm(old_centre - centre)
+            distance = max(distance, np.linalg.norm(front - old_front))
+            old_centre = centre
+            old_front = front
+
+            # Make sure commands aren't sent too rapidly
+            current_time = round(time.time() * 1000)
+
+            if distance < TOL_STATIONARY and current_time > next_command_time:
+                if calibration_mode == 2: # Just finished a forward calibration
+                    forward = centre - start_centre
+                    print(f"forward {forward}")
+                    true_front = transform_coords(centre, start_centre, start_front)
+                    print(f"true_front {true_front}")
+                    cv2.line(frame, np.int0(start_centre), np.int0(centre), (0,0,255), 3)
+                    cv2.imshow("Tracking", frame)
+                    cv2.waitKey(0)
+                    break
+                command, duration = CALIBRATION_COMMANDS[calibration_mode]
+                if calibration_mode == 1: # Just finished a rotation calibration
+                    CofR = centre_of_rotation(start_centre, start_front, centre, front)
+                    CofR_trans = transform_coords(CofR, centre, front)
+                    calibration["CofR"] = CofR_trans
+                    print(f"CofR_trans {CofR_trans}")
+                    cv2.circle(frame, np.int0(CofR), 5, (255,255,0), -1)
+                    cv2.line(frame, np.int0(centre), np.int0(start_centre), (0,0,255), 3)
+                    cv2.line(frame, np.int0(front), np.int0(start_front), (0,255,255), 3)
+                    cv2.imshow("Tracking", frame)
+                    cv2.waitKey(0)
+
+                calibration_mode += 1
+                start_centre = centre
+                start_front = front
+                # Turn that into a getString
+                duration *= 1000 # Turn s into ms
+                duration = int(duration)
+                getString = ip + "/TRIGGER/" + str(command[0]) + "/" + str(command[1]) + "//" + str(duration) + "/"
+
+            SEND_COMMANDS and urllib.request.urlopen(getString)
+            print("sending new command")
+            print(getString)
+            lastString = getString
+            next_command_time = round(time.time() * 1000) + duration + MIN_COMMAND_INTERVAL * 4
+        cv2.circle(frame, np.int0(start_centre), 5, (0,255,0), -1)
+        cv2.imshow("Tracking", frame)
+
+        key = cv2.waitKey(1) & 0xFF
+        # Exit if q pressed
+        if key == ord('q'):
+            break
+     
+    cv2.destroyAllWindows()
 
 if __name__ == "__main__":
     # _test_go_to_target()
     _test_go_loop()
+    # _test_calibrate()
+    # a0 = np.array((1,0))
+    # a1 = np.array((0,1))
+    # b0 = np.array((0,1))
+    # b1 = np.array((-1,0))
+    # result = centre_of_rotation(a0, b0, a1, b1)
+    # print(result)

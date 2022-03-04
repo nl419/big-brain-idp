@@ -122,20 +122,58 @@ def transform_coords(x: np.ndarray, centre: np.ndarray, front: np.ndarray):
         The transformed coordinates
     """
     
-    # Take an input coordinate, plus the centre & front coordinates,
-    # return the coordinate in the robot's frame of reference
     dx = x - centre
     df = front - centre
     # Transformation matrix of df to unit length x axis
     mat = np.array(((df[0], df[1]), (-df[1], df[0]))) / np.linalg.norm(df)**2
     return np.matmul(mat, dx)
 
+def untransform_coords(x: np.ndarray, centre: np.ndarray, front: np.ndarray):
+    """Transform coordinates out of the local coordinate system of the robot
+
+    Examples:
+    All inputs should be numpy arrays, but are written as tuples for convenience
+    >>> transform_coords((1,0), (0,0), (1,0))
+    (1, 0)
+    >>> transform_coords((1,0), (0,0), (1,1))
+    (1, 1)
+
+    Parameters
+    ----------
+    x : np.ndarray
+        The coordinates to untransform
+    centre : np.ndarray
+        Coordinates (x,y) of the centre of the robot
+    front : np.ndarray
+        Coordinates (x,y) of the front of the robot
+
+    Returns
+    -------
+    np.ndarray
+        The transformed coordinates
+    """
+    
+    df = front - centre
+    # Transformation matrix of df to unit length x axis
+    mat = np.array(((df[0], -df[1]), (df[1], df[0])))
+    return np.matmul(mat, x) + centre
+
+def get_CofR(centre: np.ndarray, front: np.ndarray):
+    COFR_TRANSFORMED = np.array((-0.74257382, -0.13944251))
+    return untransform_coords(COFR_TRANSFORMED, centre, front)
+
+def get_true_front(centre: np.ndarray, front:np.ndarray):
+    TRUE_FRONT_TRANSFORMED = np.array((3.31095469, 0.02314122))
+    return untransform_coords(TRUE_FRONT_TRANSFORMED, centre, front)
+
 def _test_transform():
     x = np.array([1,0])
-    c = np.array([0,0])
-    f = np.array([1,1])
+    c = np.array([2,1])
+    f = np.array([3,1])
     result = transform_coords(x,c,f)
-    print(result)
+    print(f"transformed {result}")
+    unresult = untransform_coords(result, c,f)
+    print(f"untransformed {unresult}")
 
 def _test_image():
     # load image
