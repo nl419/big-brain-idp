@@ -12,6 +12,7 @@ import urllib.request
 from find_qr import *
 from find_dots import DotPatternVideo
 import time
+import math
 
 
 FORWARD = np.array((-250,-255))
@@ -139,7 +140,6 @@ def go_to_coord_timed (start: np.ndarray, end: np.ndarray, front: np.ndarray):
         return (0,0),0
     return command, duration
 
-
 def go_to_coord (start: np.ndarray, end: np.ndarray, front: np.ndarray,
                  pixelScale: float = 1,
                  smallTurnThresh: float = 0.2, largeTurnThresh: float = 0.5,
@@ -204,6 +204,55 @@ def go_to_coord (start: np.ndarray, end: np.ndarray, front: np.ndarray,
     if doMove: command += translation
     return np.clip(command, -255, 255).astype(int)
 
+def calibrate_rotation (centre0: np.ndarray, front0: np.ndarray, centre1: np.ndarray, front1: np.ndarray):
+    """Returns the centre of rotation for a pair of initial and final coords
+    for two points on the robot (usually centre and front are convenient choices)
+
+    Parameters
+    ----------
+    centre0 : np.ndarray
+        Coordinates (x,y) of the centre of the robot before the motion
+    front0 : np.ndarray
+        Coordinates (x,y) of the front of the robot before the motion
+    centre1 : np.ndarray
+        Coordinates (x,y) of the centre of the robot after the motion
+    front1 : np.ndarray
+        Coordinates (x,y) of the front of the robot after the motion
+
+    Returns
+    -------
+    np.ndarray
+        Coordinates (x,y) of the centre of rotation of the robot
+    """
+    
+    # https://stackoverflow.com/questions/3252194/numpy-and-line-intersections
+    # return 2D vector perpendicular to input
+    def perp(a):
+        b = np.empty_like(a)
+        b[0] = -a[1]
+        b[1] = a[0]
+        return b
+
+    # return intersections of line segments a and b, each defined with 2 points
+    def seg_intersect(a1,a2, b1,b2) :
+        da = a2-a1
+        db = b2-b1
+        dp = a1-b1
+        dap = perp(da)
+        denom = np.dot(dap, db)
+        num = np.dot(dap, dp)
+        return (num / denom.astype(float))*db + b1
+    
+    dc = centre1 - centre0
+    df = front1 - front0
+
+    # Get points defining the line perpendicular to each of dc and df
+    centrehalf = (centre0 + centre1) / 2
+    centreperp = centrehalf + perp(dc)
+    fronthalf = (front0 + front1) / 2
+    frontperp = fronthalf + perp(df)
+
+    return seg_intersect(centrehalf, centreperp, fronthalf, frontperp)
 
 ip = "http://192.168.137.43"
 
@@ -353,6 +402,8 @@ def _test_go_loop():
                     go_to_dropoff_side = not go_to_dropoff_side
                     command, duration = cross_bridge(centre, front, go_to_dropoff_side)
                 duration *= 1000 # Turn s into ms
+                if math.isnan(duration): # If nan, just give up, and pray the next frame is ok.
+                    continue
                 duration = int(duration)
                 getString = ip + "/TRIGGER/" + str(command[0]) + "/" + str(command[1]) + "//" + str(duration) + "/"
 
