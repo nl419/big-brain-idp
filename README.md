@@ -1,8 +1,6 @@
 # big-brain-idp
 BIG BRAINS ONLY
 
-PLEASE LEAVE IF YOUR BRAIN SMOL OR PP
-
 Please use the NumPy format for Docstrings.
 https://numpydoc.readthedocs.io/en/latest/format.html
 
