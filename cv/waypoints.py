@@ -387,12 +387,12 @@ def generate_waypoints(shift, invmat):
         )
     )
 
-    HOME_WAYPOINT = Waypoint(target_pos=HOME,
+    HOME_WAYPOINTS = (Waypoint(target_pos=HOME,
                             target_orient=(DROPOFF_CROSS - HOME),
                             pos_tol=10, orient_tol=5, robot_offset=ZEROS,
-                            orient_backward_ok=False, move_backward_ok=True)
+                            orient_backward_ok=False, move_backward_ok=True))
     
-    return BLUE_WAYPOINTS, RED_WAYPOINTS, BRIDGE_WAYPOINTS, HOME_WAYPOINT
+    return BLUE_WAYPOINTS, RED_WAYPOINTS, BRIDGE_WAYPOINTS, HOME_WAYPOINTS
 
 
 if __name__ == "__main__":
