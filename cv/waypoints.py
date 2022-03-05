@@ -17,7 +17,7 @@ class Waypoint:
     # target_pos
     _robot_offset: np.ndarray
 
-    def __init__(self, target_pos: np.ndarray, target_orient: np.ndarray, 
+    def __init__(self, target_pos: np.ndarray, target_orient: np.ndarray or None, 
                  pos_tol: float, orient_tol: float, robot_offset: np.ndarray, 
                  orient_backward_ok: bool = False, move_backward_ok: bool = True):
         """A waypoint on the board. Run [Waypoint object].get_command(centre, front) 
@@ -27,7 +27,7 @@ class Waypoint:
         ----------
         target_pos : np.ndarray
             Coordinates (x,y) of the target
-        target_orient : np.ndarray
+        target_orient : np.ndarray | None
             Vector (x,y) to align with the true front direction of the robot
         pos_tol : float
             Tolerance for being "at" the target position
@@ -38,10 +38,14 @@ class Waypoint:
         orient_backward_ok : bool, optional
             Whether aligning to the reverse orientation is ok, by default False
         move_backward_ok : bool, optional
-            Whether moving backward for large distances is ok, by default True
+            Whether moving backward for large distances is ok, by default True.
+            This parameter is only used if target_orient is None
         """
         self._target_pos = target_pos
-        self._target_orient = target_orient / np.linalg.norm(target_orient)
+        if target_orient is None:
+            self._target_orient = None
+        else:
+            self._target_orient = target_orient / np.linalg.norm(target_orient)
         self._pos_tol = pos_tol
         self._orient_tol = orient_tol
         self._robot_offset = robot_offset
@@ -202,8 +206,164 @@ class Waypoint:
 
         return None, 0
 
+BLUE_CORNER = np.array((1,1))
+RED_CORNER = np.array((2,2))
+PICKUP_CROSS = np.array((3,3))
+DROPOFF_CROSS = np.array((4,4))
+
+BRIDGE_MIDDLE = (PICKUP_CROSS + DROPOFF_CROSS) / 2
+
+BLUE_DROPOFFS = np.array((
+    (5,5),
+    (6,6)
+))
+RED_DROPOFFS = np.array((
+    (7,7),
+    (8,8)
+))
+
+# Intermediate waypoints
+BLUE_POINT_PICKUP = np.array((1,1))
+BLUE_POINT_DROPOFF = np.array((2,2))
+BLUE_POINT_BOX1 = np.array((5,5))
+BLUE_POINT_BOX2 = np.array((6,6))
+
+RED_POINT_PICKUP = np.array((3,3))
+RED_POINT_DROPOFF = np.array((4,4))
+RED_POINT_BOX1 = np.array((7,7))
+RED_POINT_BOX2 = np.array((8,8))
+
+
+HOME = np.array((9,9))
+
+ZEROS = np.array((0,0))
+MECHANISM = np.array((1,1)) # Location of mechanism relative to robot pov
+
+# Lists of waypoints to execute after a block is obtained
+BLUE_WAYPOINTS = (
+    (
+        Waypoint(target_pos=BLUE_POINT_PICKUP, 
+                 target_orient=(BLUE_CORNER-BLUE_POINT_PICKUP),
+                 pos_tol=25, orient_tol=15, robot_offset=ZEROS,
+                 orient_backward_ok=False, move_backward_ok=False),
+        Waypoint(target_pos=BLUE_CORNER, 
+                 pos_tol=5, orient_tol=5, robot_offset=ZEROS, 
+                 orient_backward_ok=False, move_backward_ok=False),
+        Waypoint(target_pos=BLUE_POINT_DROPOFF, 
+                 pos_tol=25, orient_tol=15, robot_offset=ZEROS,
+                 orient_backward_ok=False, move_backward_ok=False),
+        Waypoint(target_pos=BLUE_POINT_BOX1,
+                 target_orient=(BLUE_DROPOFFS[0]-BLUE_POINT_BOX1),
+                 pos_tol=5, orient_tol=5, robot_offset=MECHANISM,
+                 orient_backward_ok=False, move_backward_ok=False),
+        Waypoint(target_pos=BLUE_DROPOFFS[0],
+                 pos_tol=2, orient_tol=2, robot_offset=MECHANISM,
+                 orient_backward_ok=False, move_backward_ok=False),
+    ),
+    (
+        Waypoint(target_pos=BLUE_POINT_PICKUP, 
+                 target_orient=(BLUE_CORNER-BLUE_POINT_PICKUP),
+                 pos_tol=25, orient_tol=15, robot_offset=ZEROS,
+                 orient_backward_ok=False, move_backward_ok=False),
+        Waypoint(target_pos=BLUE_CORNER, 
+                 pos_tol=5, orient_tol=5, robot_offset=ZEROS, 
+                 orient_backward_ok=False, move_backward_ok=False),
+        Waypoint(target_pos=BLUE_POINT_DROPOFF, 
+                 pos_tol=25, orient_tol=15, robot_offset=ZEROS,
+                 orient_backward_ok=False, move_backward_ok=False),
+        Waypoint(target_pos=BLUE_POINT_BOX1,
+                 target_orient=(BLUE_DROPOFFS[1]-BLUE_POINT_BOX1),
+                 pos_tol=5, orient_tol=5, robot_offset=MECHANISM,
+                 orient_backward_ok=False, move_backward_ok=False),
+        Waypoint(target_pos=BLUE_DROPOFFS[1],
+                 pos_tol=2, orient_tol=2, robot_offset=MECHANISM,
+                 orient_backward_ok=False, move_backward_ok=False),
+    )
+)
+
+RED_WAYPOINTS = (
+    (
+        Waypoint(target_pos=RED_POINT_PICKUP, 
+                 target_orient=(RED_CORNER-RED_POINT_PICKUP),
+                 pos_tol=25, orient_tol=15, robot_offset=ZEROS,
+                 orient_backward_ok=False, move_backward_ok=False),
+        Waypoint(target_pos=RED_CORNER, 
+                 pos_tol=5, orient_tol=5, robot_offset=ZEROS, 
+                 orient_backward_ok=False, move_backward_ok=False),
+        Waypoint(target_pos=RED_POINT_DROPOFF, 
+                 pos_tol=25, orient_tol=15, robot_offset=ZEROS,
+                 orient_backward_ok=False, move_backward_ok=False),
+        Waypoint(target_pos=RED_POINT_BOX1,
+                 target_orient=(RED_DROPOFFS[0]-RED_POINT_BOX1),
+                 pos_tol=5, orient_tol=5, robot_offset=MECHANISM,
+                 orient_backward_ok=False, move_backward_ok=False),
+        Waypoint(target_pos=RED_DROPOFFS[0],
+                 pos_tol=2, orient_tol=2, robot_offset=MECHANISM,
+                 orient_backward_ok=False, move_backward_ok=False),
+    ),
+    (
+        Waypoint(target_pos=RED_POINT_PICKUP, 
+                 target_orient=(RED_CORNER-RED_POINT_PICKUP),
+                 pos_tol=25, orient_tol=15, robot_offset=ZEROS,
+                 orient_backward_ok=False, move_backward_ok=False),
+        Waypoint(target_pos=RED_CORNER, 
+                 pos_tol=5, orient_tol=5, robot_offset=ZEROS, 
+                 orient_backward_ok=False, move_backward_ok=False),
+        Waypoint(target_pos=RED_POINT_DROPOFF, 
+                 pos_tol=25, orient_tol=15, robot_offset=ZEROS,
+                 orient_backward_ok=False, move_backward_ok=False),
+        Waypoint(target_pos=RED_POINT_BOX1,
+                 target_orient=(RED_DROPOFFS[1]-RED_POINT_BOX1),
+                 pos_tol=5, orient_tol=5, robot_offset=MECHANISM,
+                 orient_backward_ok=False, move_backward_ok=False),
+        Waypoint(target_pos=RED_DROPOFFS[1],
+                 pos_tol=2, orient_tol=2, robot_offset=MECHANISM,
+                 orient_backward_ok=False, move_backward_ok=False),
+    )
+)
+
+# 0 = go over bridge to pickup, 1 = go over bridge to dropoff
+BRIDGE_WAYPOINTS = (
+    (
+        Waypoint(target_pos=DROPOFF_CROSS,
+                 target_orient=(BRIDGE_MIDDLE - DROPOFF_CROSS),
+                 pos_tol=10, orient_tol=5, robot_offset=ZEROS,
+                 orient_backward_ok=False, move_backward_ok=False),
+        Waypoint(target_pos=BRIDGE_MIDDLE,
+                 target_orient=None,
+                 pos_tol=40, orient_tol=5, robot_offset=ZEROS,
+                 orient_backward_ok=False, move_backward_ok=False),
+        Waypoint(target_pos=PICKUP_CROSS,
+                 target_orient=None,
+                 pos_tol=40, orient_tol=5, robot_offset=ZEROS,
+                 orient_backward_ok=False, move_backward_ok=False),
+    ),
+    (
+        Waypoint(target_pos=PICKUP_CROSS,
+                 target_orient=(BRIDGE_MIDDLE - PICKUP_CROSS),
+                 pos_tol=10, orient_tol=5, robot_offset=ZEROS,
+                 orient_backward_ok=False, move_backward_ok=False),
+        Waypoint(target_pos=BRIDGE_MIDDLE,
+                 target_orient=None,
+                 pos_tol=40, orient_tol=5, robot_offset=ZEROS,
+                 orient_backward_ok=False, move_backward_ok=False),
+        Waypoint(target_pos=DROPOFF_CROSS,
+                 target_orient=None,
+                 pos_tol=40, orient_tol=5, robot_offset=ZEROS,
+                 orient_backward_ok=False, move_backward_ok=False),
+    )
+)
+
+HOME_WAYPOINT = Waypoint(target_pos=HOME,
+                         target_orient=(DROPOFF_CROSS - HOME),
+                         pos_tol=10, orient_tol=5, robot_offset=ZEROS,
+                         orient_backward_ok=False, move_backward_ok=True)
+
 
 if __name__ == "__main__":
     wp = Waypoint(target_pos=np.array((0.95,1.05)), target_orient=None, 
                   pos_tol=1, orient_tol=1, robot_offset=np.array((1,0)),
                   move_backward_ok=False)
+    centre = np.array((-1,0))
+    front = np.array((0,0))
+    print(wp.get_command(centre, front))
