@@ -69,7 +69,7 @@ while(1):
     # Print if there is a change in HSV value
     if( (phMin != hMin) | (psMin != sMin) | (pvMin != vMin) | (phMax != hMax) | (psMax != sMax) | (pvMax != vMax) ):
         print("(hMin = %d , sMin = %d, vMin = %d), (hMax = %d , sMax = %d, vMax = %d)" % (hMin , sMin , vMin, hMax, sMax , vMax))
-        print("hMin = %d; sMin = %d; vMin = %d; hMax = %d; sMax = %d; vMax = %d;" % (hMin , sMin , vMin, hMax, sMax , vMax))
+        print("hMin = %d; sMin = %d; vMin = %d; hMax = %d; sMax = %d; vMax = %d" % (hMin , sMin , vMin, hMax, sMax , vMax))
         phMin = hMin
         psMin = sMin
         pvMin = vMin
