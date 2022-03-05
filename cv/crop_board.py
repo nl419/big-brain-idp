@@ -1,6 +1,5 @@
 import numpy as np
 import cv2
-from waypoints import get_board_corners
 from find_coords import untransform_board
 
 _DEBUG = __name__ == "__main__"
@@ -131,14 +130,17 @@ def _test_kmeans():
     cv2.destroyAllWindows()
 
 def _test_crop():
+    """Test cropping into the board and into the pickup area"""
     from find_coords import get_shift_invmat_mat
     from unfisheye import undistort
     image = cv2.imread("dots/dot2.jpg")
     image = undistort(image)
     shift, invmat, _ = get_shift_invmat_mat(image)
     crop_board(image, shift, invmat)
+    cv2.destroyAllWindows()
+    crop_board(image, shift, invmat, get_pickup_corners(shift, invmat))
 
 
 if __name__ == "__main__":
-    _test_kmeans()
-    # _test_crop()
+    # _test_kmeans()
+    _test_crop()
