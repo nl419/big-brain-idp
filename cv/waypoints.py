@@ -2,6 +2,7 @@ import numpy as np
 from navigation import FORWARD, BACKWARD, LEFT, RIGHT, ROTATION_SPEED, MOVEMENT_SPEED
 from find_dots import untransform_coords, get_CofR, get_true_front, perp, angle
 from find_coords import untransform_board
+import cv2
 
 class Waypoint:
     _target_pos: np.ndarray
@@ -394,11 +395,83 @@ def generate_waypoints(shift, invmat):
     
     return BLUE_WAYPOINTS, RED_WAYPOINTS, BRIDGE_WAYPOINTS, HOME_WAYPOINTS
 
+def draw_points(image, shift, invmat):
 
-if __name__ == "__main__":
+    BLUE_CORNER = untransform_board(shift, invmat, BLUE_CORNER_T)
+    RED_CORNER = untransform_board(shift, invmat, RED_CORNER_T)
+    PICKUP_CROSS = untransform_board(shift, invmat, PICKUP_CROSS_T)
+    DROPOFF_CROSS = untransform_board(shift, invmat, DROPOFF_CROSS_T)
+
+    BRIDGE_MIDDLE = (PICKUP_CROSS + DROPOFF_CROSS) / 2
+
+    BLUE_DROPOFFS = np.array((
+        untransform_board(shift, invmat, BLUE_DROPOFFS_T[0]),
+        untransform_board(shift, invmat, BLUE_DROPOFFS_T[1])
+    ))
+    RED_DROPOFFS = np.array((
+        untransform_board(shift, invmat, RED_DROPOFFS_T[0]),
+        untransform_board(shift, invmat, RED_DROPOFFS_T[1])
+    ))
+
+    # Intermediate waypoints
+    BLUE_POINT_PICKUP = untransform_board(shift, invmat, BLUE_POINT_PICKUP_T)
+    BLUE_POINT_DROPOFF = untransform_board(shift, invmat, BLUE_POINT_DROPOFF_T)
+    BLUE_POINT_BOX1 = untransform_board(shift, invmat, BLUE_POINT_BOX1_T)
+    BLUE_POINT_BOX2 = untransform_board(shift, invmat, BLUE_POINT_BOX2_T)
+
+    RED_POINT_PICKUP = untransform_board(shift, invmat, RED_POINT_PICKUP_T)
+    RED_POINT_DROPOFF = untransform_board(shift, invmat, RED_POINT_DROPOFF_T)
+    RED_POINT_BOX1 = untransform_board(shift, invmat, RED_POINT_BOX1_T)
+    RED_POINT_BOX2 = untransform_board(shift, invmat, RED_POINT_BOX2_T)
+
+    HOME = untransform_board(shift, invmat, HOME_T)
+
+    BLUES = [BLUE_CORNER, BLUE_DROPOFFS[0], BLUE_DROPOFFS[1],
+             BLUE_POINT_PICKUP, BLUE_POINT_DROPOFF,
+             BLUE_POINT_BOX1, BLUE_POINT_BOX2]
+    REDS =  [RED_CORNER, RED_DROPOFFS[0], RED_DROPOFFS[1],
+             RED_POINT_PICKUP, RED_POINT_DROPOFF,
+             RED_POINT_BOX1, RED_POINT_BOX2]
+    MISC =  [PICKUP_CROSS, DROPOFF_CROSS, BRIDGE_MIDDLE, HOME]
+
+    for p in BLUES:
+        cv2.drawMarker(image, np.int0(p), (255,0,0), cv2.MARKER_CROSS, 10, 2)
+    for p in REDS:
+        cv2.drawMarker(image, np.int0(p), (0,0,255), cv2.MARKER_CROSS, 10, 2)
+    for p in MISC:
+        cv2.drawMarker(image, np.int0(p), (0,255,0), cv2.MARKER_CROSS, 10, 2)
+    return image
+
+def _test_waypoint():
     wp = Waypoint(target_pos=np.array((100,100)), target_orient=None, 
                   pos_tol=1, orient_tol=1, robot_offset=np.array((1,0)),
                   move_backward_ok=False)
     centre = np.array((0,0))
     front = np.array((1,1))
     print(wp.get_command(centre, front))
+
+def _test_points():
+    from unfisheye import undistort
+    from crop_board import remove_shadow, crop_board
+    from find_coords import get_shift_invmat_mat
+    # image = cv2.imread("new_board/1.jpg")
+    image = cv2.imread("dots/dot3.jpg")
+    # image = cv2.imread("checkerboard2/3.jpg")
+    image = undistort(image)
+    image2 = image.copy()
+    
+    # Preprocess
+    image2 = remove_shadow(image2)
+    shift, invmat, mat = get_shift_invmat_mat(image2)
+    image = crop_board(image, shift, invmat)
+    image = remove_shadow(image)
+
+
+    draw_points(image, shift, invmat)
+    cv2.imshow("image", image)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
+
+if __name__ == "__main__":
+    # _test_waypoint()
+    _test_points()
