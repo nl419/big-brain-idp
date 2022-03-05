@@ -8,8 +8,10 @@ import numpy as np
 def nothing(x):
     pass
 
+invert_hue = True
+
 # Load in image
-image = cv2.imread('dots/dot12.jpg')
+image = cv2.imread('dots/dot9.jpg')
 # Optionally undistort the image
 from unfisheye import undistort
 image = undistort(image)
@@ -17,7 +19,7 @@ image = undistort(image)
 SHOW_MASK = False # False => show entire image after threshold, True => just show mask
 
 # Set initial values
-hMin = 140; sMin = 90; vMin = 101; hMax = 166; sMax = 255; vMax = 255
+hMin = 17; sMin = 113; vMin = 139; hMax = 49; sMax = 255; vMax = 255
 
 # Create a window, scale it to fit screen
 win = cv2.namedWindow('image', cv2.WINDOW_GUI_NORMAL)
@@ -57,13 +59,28 @@ while(1):
     sMax = cv2.getTrackbarPos('SMax','image')
     vMax = cv2.getTrackbarPos('VMax','image')
 
-    # Set minimum and max HSV values to display
-    lower = np.array([hMin, sMin, vMin])
-    upper = np.array([hMax, sMax, vMax])
+    if invert_hue:
+        # Choose all parts of the image EXCEPT the selected hue
+        # (also limit by sat and val)
+        lower0 = np.array([0, sMin, vMin])
+        upper0 = np.array([hMin, sMax, vMax])
 
-    # Create HSV Image and threshold into a range.
-    hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-    mask = cv2.inRange(hsv, lower, upper)
+        lower1 = np.array([hMax, sMin, vMin])
+        upper1 = np.array([179, sMax, vMax])
+
+        hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+        mask0 = cv2.inRange(hsv, lower0, upper0)
+        mask1 = cv2.inRange(hsv, lower1, upper1)
+        mask = cv2.bitwise_or(mask0, mask1)
+    else:
+        # Set minimum and max HSV values to display
+        lower = np.array([hMin, sMin, vMin])
+        upper = np.array([hMax, sMax, vMax])
+
+        # Create HSV Image and threshold into a range.
+        hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+        mask = cv2.inRange(hsv, lower, upper)
+    
     output = cv2.bitwise_and(image,image, mask= mask)
 
     # Print if there is a change in HSV value
