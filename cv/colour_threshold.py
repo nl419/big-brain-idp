@@ -11,8 +11,8 @@ def nothing(x):
 invert_hue = False
 
 # Load in image
-# image = cv2.imread('new_board/1.jpg')
-image = cv2.imread('dots/dot3.jpg')
+image = cv2.imread('new_board/1.jpg')
+# image = cv2.imread('dots/dot3.jpg')
 # image = cv2.imread('checkerboard2/3.jpg')
 
 # Preprocess
@@ -20,21 +20,26 @@ from unfisheye import undistort
 from crop_board import crop_board, remove_shadow, kmeans
 from find_coords import get_shift_invmat_mat
 image = undistort(image)
-# image = remove_shadow(image)
+shift, invmat, _ = get_shift_invmat_mat(image)
+image = crop_board(image, shift, invmat)
+image = remove_shadow(image)
+cv2.imshow("image", image)
+cv2.waitKey(0)
+# image = kmeans(image, 14)
 # cv2.imshow("image", image)
 # cv2.waitKey(0)
-# image = kmeans(image, 14)
-# shift, invmat, _ = get_shift_invmat_mat(image)
 
 
-SHOW_MASK = False # False => show entire image after threshold, True => just show mask
+
+SHOW_MASK = True # False => show entire image after threshold, True => just show mask
 
 # Set initial values
-hMin = 17; sMin = 81; vMin = 97; hMax = 49; sMax = 255; vMax = 255
+hMin = 20; sMin = 20; vMin = 20; hMax = 50; sMax = 255; vMax = 255
 
 # Create a window, scale it to fit screen
-win = cv2.namedWindow('image', cv2.WINDOW_GUI_NORMAL)
-cv2.resizeWindow('image', 600, 600)
+# win = cv2.namedWindow('image', cv2.WINDOW_GUI_NORMAL + cv2.WINDOW_NORMAL)
+win = cv2.namedWindow('image', cv2.WINDOW_NORMAL)
+cv2.resizeWindow('image', 50, 50)
 
 # create trackbars for color change
 cv2.createTrackbar('HMin','image',0,179,nothing) # Hue is from 0-179 for Opencv

@@ -165,5 +165,5 @@ def _test_crop():
 
 
 if __name__ == "__main__":
-    _test_kmeans()
-    # _test_crop()
+    # _test_kmeans()
+    _test_crop()

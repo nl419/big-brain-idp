@@ -2,7 +2,7 @@
 import cv2
 import numpy as np
 
-_DEBUG = False and __name__ == "__main__"
+_DEBUG = __name__ == "__main__"
 
 # function to display the coordinates of
 # of the points clicked on the image
@@ -82,7 +82,8 @@ def barrier_centres(image: np.ndarray):
     # Only pickup the yellow parts
     # Filter out small areas
     # Pick the two contours which are closest to the middle
-    hMin = 17; sMin = 81; vMin = 97; hMax = 49; sMax = 255; vMax = 255
+    # hMin = 17; sMin = 81; vMin = 97; hMax = 49; sMax = 255; vMax = 255
+    hMin = 20; sMin = 20; vMin = 20; hMax = 50; sMax = 255; vMax = 255
     lower = np.array([hMin, sMin, vMin])
     upper = np.array([hMax, sMax, vMax])
 
@@ -93,10 +94,13 @@ def barrier_centres(image: np.ndarray):
     cnts, _ = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
     middle = np.array((image.shape[1], image.shape[0])) / 2
     if _DEBUG:
-        cv2.drawContours(image, cnts, -1, (255,255,0), 3)
-        cv2.circle(image, np.int0(middle), 10, (0,255,0), 3)
-        cv2.imshow("image", image)
+        image_cnt = image.copy()
+        cv2.drawContours(image_cnt, cnts, -1, (255,255,0), 2)
+        cv2.circle(image_cnt, np.int0(middle), 10, (0,255,0), 3)
+        cv2.imshow("image_cnt", image_cnt)
         cv2.waitKey(0)
+
+        image_cnt_thresh = image.copy()
     centres = []
     areas = []
     for c in cnts:
@@ -108,6 +112,14 @@ def barrier_centres(image: np.ndarray):
             centre = np.array(centre) - middle
             centres.append(centre)
             areas.append(area)
+            if _DEBUG:
+                cv2.drawContours(image_cnt_thresh, [c], -1, (255,255,0), 2)
+    if _DEBUG:
+        cv2.imshow("image_cnt_thresh", image_cnt_thresh)
+        cv2.waitKey(0)
+        cv2.destroyWindow("image_cnt_thresh")
+        cv2.destroyWindow("image_cnt")
+
     # Grab the two closest contours to the middle
     mags = np.linalg.norm(centres, axis=1)
     args = mags.argsort()
@@ -203,11 +215,24 @@ def _pick_points():
 
 def _pick_points_normalised():
     from unfisheye import undistort
+    from crop_board import crop_board, remove_shadow
+
     # Return the points normalised by the barrier positions
-    # image = cv2.imread('dots/dot4.jpg', 1)
-    image = cv2.imread('checkerboard2/3.jpg', 1)
+
+    # image = cv2.imread('new_board/1.jpg')
+    # image = cv2.imread('dots/dot4.jpg')
+    image = cv2.imread('checkerboard2/3.jpg')
+
     image = undistort(image)
-    shift, _, mat = get_shift_invmat_mat(image)
+    image2 = image.copy()
+    # Shadow removal on an uncropped image results in many artefacts,
+    # but is helpful for reliable shift / mat calculation.
+    # So we keep a copy handy, before any artefacts.
+    
+    # Preprocessing
+    image2 = remove_shadow(image2)
+    shift, invmat, mat = get_shift_invmat_mat(image2)
+    image = crop_board(image, shift, invmat)
 
     # displaying the image
     cv2.imshow('image', image)
