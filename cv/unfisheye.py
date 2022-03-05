@@ -3,23 +3,10 @@
 import numpy as np
 import cv2
 
-# MAC checkerboard
-# DIM=(1806, 1440)
-# K=np.array([[1000.0817683510912, 0.0, 898.0145797792809], [0.0, 1003.730509803676, 795.6302878125562], [0.0, 0.0, 1.0]])
-# D=np.array([[-0.15481953360923378], [0.46847268935941083], [-0.6939986960654416], [0.3509367759414608]])
-# pic_name = "cv/1.jpg"
-
-# Windows checkerboard
-# DIM=(903, 720)
-# K=np.array([[497.25261908023276, 0.0, 451.0843444150783], [0.0, 495.86040011896534, 385.5926770729965], [0.0, 0.0, 1.0]])
-# D=np.array([[-0.09268730609892956], [0.2504965645950943], [-0.3533145752831843], [0.16524591721022114]])
-# pic_name = "cv/1.jpg"
-
 # Windows checkerboard2
 DIM=(1016, 760)
 K=np.array([[617.046363722009, 0.0, 508.1742575190148], [0.0, 614.3819211597321, 382.7568542470966], [0.0, 0.0, 1.0]])
 D=np.array([[-0.23284420692502958], [0.7725973070172576], [-1.2587721414504571], [0.7234483916379288]])
-pic_name = "checkerboard2/3.jpg"
 
 debug = __name__ == "__main__"
 
@@ -74,6 +61,8 @@ def undistort(img: np.ndarray , balance=0.0, dim2=None, dim3=None) -> np.ndarray
         cv2.destroyAllWindows()
     return undistorted_img
 if debug:
+    # pic_name = "checkerboard2/3.jpg"
+    pic_name = "new_board/1.jpg"
     img = cv2.imread(pic_name)
-    undistort(img, 0.4)
+    undistort(img)
 
