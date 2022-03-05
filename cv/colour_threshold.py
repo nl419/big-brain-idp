@@ -14,9 +14,9 @@ do_remove_shadow = True
 do_kmeans = True
 
 # Load in image
-image = cv2.imread('new_board/1.jpg')
+# image = cv2.imread('new_board/1.jpg')
 # image = cv2.imread('dots/dot3.jpg')
-# image = cv2.imread('checkerboard2/3.jpg')
+image = cv2.imread('checkerboard2/3.jpg')
 
 # Preprocess
 from unfisheye import undistort
@@ -29,7 +29,7 @@ if do_crop_table:
     shift, invmat, _ = get_shift_invmat_mat(image2)
     image = crop_board(image, shift, invmat)
 if do_remove_shadow:
-    image = remove_shadow(image)
+    image = remove_shadow(image, 101)
 image = cv2.resize(image, (image.shape[1]//2, image.shape[0]//2))
 cv2.imshow("image", image)
 cv2.waitKey(0)
