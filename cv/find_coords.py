@@ -67,10 +67,22 @@ def click_event_normalised(event, x, y, flags, params):
         cv2.imshow('image', image)
 
 def barrier_centres(image: np.ndarray):
+    """Find the centrepoints of the yellow barriers in the image
+
+    Parameters
+    ----------
+    image : np.ndarray
+        The image to search (works best if undistorted)
+
+    Returns
+    -------
+    np.ndarray
+        The two centrepoints of the barriers
+    """
     # Only pickup the yellow parts
     # Filter out small areas
     # Pick the two contours which are closest to the middle
-    hMin = 17; sMin = 50; vMin = 160; hMax = 49; sMax = 255; vMax = 255
+    hMin = 17; sMin = 81; vMin = 97; hMax = 49; sMax = 255; vMax = 255
     lower = np.array([hMin, sMin, vMin])
     upper = np.array([hMax, sMax, vMax])
 
