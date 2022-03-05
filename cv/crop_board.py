@@ -1,15 +1,44 @@
 import numpy as np
 import cv2
 from waypoints import get_board_corners
+from find_coords import untransform_board
 
-
-# Take an image (without fisheye effects), and apply a mask to only include
-# the board (i.e. remove all the stuff around the board)
 _DEBUG = __name__ == "__main__"
+
+BOARD_CORNERS_T = np.array((
+    (-0.04257, -2.39275),
+    (-2.36891, -0.01291),
+    (-0.06849, 2.59533),
+    (2.55669, -0.03823)
+))
+
+PICKUP_CORNERS_T = np.array((
+    (0.22048, 1.67371),
+    (-0.31464, 1.64469),
+    (-0.32059, 2.16882),
+    (0.20810, 2.20481)
+))
+
+def get_board_corners(shift, invmat):
+    return np.array((
+        untransform_board(shift, invmat, BOARD_CORNERS_T[0]),
+        untransform_board(shift, invmat, BOARD_CORNERS_T[1]),
+        untransform_board(shift, invmat, BOARD_CORNERS_T[2]),
+        untransform_board(shift, invmat, BOARD_CORNERS_T[3])
+    ))
+
+def get_pickup_corners(shift, invmat):
+    return np.array((
+        untransform_board(shift, invmat, PICKUP_CORNERS_T[0]),
+        untransform_board(shift, invmat, PICKUP_CORNERS_T[1]),
+        untransform_board(shift, invmat, PICKUP_CORNERS_T[2]),
+        untransform_board(shift, invmat, PICKUP_CORNERS_T[3])
+    ))
+    
 
 def crop_board(image: np.ndarray, shift: np.ndarray, invmat: np.ndarray,
                corners: np.ndarray = None):
-    """Remove everything in the image except for areas inside the corners
+    """Remove everything in the image except for the area inside the corners
 
     Parameters
     ----------
