@@ -69,7 +69,8 @@ def crop_board(image: np.ndarray, shift: np.ndarray, invmat: np.ndarray,
     return cropped
 
 def remove_shadow(image: np.ndarray):
-    """Remove the lightspots / shadows from an image of the board
+    """Remove the lightspots / shadows from an image of the board.
+    Works best if the image is already cropped into the board
 
     Parameters
     ----------
@@ -102,6 +103,34 @@ def remove_shadow(image: np.ndarray):
 
     return cv2.bitwise_not(result_norm)
 
+def kmeans(image: np.ndarray, K: int):
+    """Limit the image to only contain "K" colours
+
+    Parameters
+    ----------
+    image : np.ndarray
+        The image to process
+    K : int
+        How many colours the final image should contain
+
+    Returns
+    -------
+    np.ndarray
+        Image with limited number of colours
+    """
+
+    Z = image.reshape((-1,3))
+    # convert to np.float32
+    Z = np.float32(Z)
+    # define criteria, number of clusters(K) and apply kmeans()
+    criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 10, 1.0)
+    ret,label,center=cv2.kmeans(Z,K,None,criteria,10,cv2.KMEANS_RANDOM_CENTERS)
+    # Now convert back into uint8, and make original image
+    center = np.uint8(center)
+    res = center[label.flatten()]
+    return res.reshape((image.shape))
+
+
 def _test_kmeans():
     from find_coords import get_shift_invmat_mat
     from unfisheye import undistort
@@ -113,19 +142,8 @@ def _test_kmeans():
     shift, invmat, mat = get_shift_invmat_mat(image)
     image = crop_board(image, shift, invmat)
     image = remove_shadow(image)
-
-    K = 8
-    Z = image.reshape((-1,3))
-    # convert to np.float32
-    Z = np.float32(Z)
-    # define criteria, number of clusters(K) and apply kmeans()
-    criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 10, 1.0)
-    ret,label,center=cv2.kmeans(Z,K,None,criteria,10,cv2.KMEANS_RANDOM_CENTERS)
-    # Now convert back into uint8, and make original image
-    center = np.uint8(center)
-    res = center[label.flatten()]
-    res2 = res.reshape((image.shape))
-    cv2.imshow('res2',res2)
+    image = kmeans(image, 8)
+    cv2.imshow('image',image)
     cv2.waitKey(0)
     cv2.destroyAllWindows()
 
@@ -142,5 +160,5 @@ def _test_crop():
 
 
 if __name__ == "__main__":
-    # _test_kmeans()
-    _test_crop()
+    _test_kmeans()
+    # _test_crop()
