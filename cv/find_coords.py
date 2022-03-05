@@ -10,6 +10,7 @@ def click_event(event, x, y, flags, params):
     image = params
     # checking for left mouse clicks
     if event == cv2.EVENT_LBUTTONDOWN:
+        coords = np.array((x,y))
 
         # displaying the coordinates
         # on the Shell
@@ -21,6 +22,7 @@ def click_event(event, x, y, flags, params):
         cv2.putText(image, str(x) + ',' +
                     str(y), (x,y), font,
                     1, (255, 0, 0), 2)
+        cv2.drawMarker(image, np.int0(coords), (0,0,255), cv2.MARKER_CROSS, 10, 2)
         cv2.imshow('image', image)
 
     # checking for right mouse clicks    
@@ -64,6 +66,7 @@ def click_event_normalised(event, x, y, flags, params):
         cv2.putText(image, str(x) + ',' +
                     str(y), (x,y), font,
                     1, (255, 0, 0), 2)
+        cv2.drawMarker(image, np.int0(coords), (0,0,255), cv2.MARKER_CROSS, 10, 2)
         cv2.imshow('image', image)
 
 def barrier_centres(image: np.ndarray):
@@ -126,6 +129,93 @@ def barrier_centres(image: np.ndarray):
     centres = np.take(centres, args[:2], axis=0)
 
     return centres + middle
+
+def dropoff_boxes(img: np.ndarray):
+    # Find the dropoff boxes
+    
+    # Threshold for white
+    # Do a hat (idk if its blackhat or tophat)
+    # Find the point that is nearest to the expected location of the cross
+    
+    # Preprocess
+    from unfisheye import undistort
+    from crop_board import crop_board, remove_shadow, kmeans
+    from find_coords import get_shift_invmat_mat
+    image = img.copy()
+    image2 = image.copy()
+    image2 = remove_shadow(image2)
+    shift, invmat, _ = get_shift_invmat_mat(image2)
+    image = crop_board(image, shift, invmat)
+    image = remove_shadow(image, 101)
+    image = kmeans(image, 4)
+
+    if _DEBUG:
+        cv2.imshow("Kmeans", image)
+        cv2.waitKey(0)
+        cv2.destroyWindow("Kmeans")
+
+    # Threshold for white
+    hMin = 0; sMin = 0; vMin = 70; hMax = 179; sMax = 40; vMax = 255
+    lower = np.array([hMin, sMin, vMin])
+    upper = np.array([hMax, sMax, vMax])
+    hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+    mask = cv2.inRange(hsv, lower, upper)
+
+    if _DEBUG:
+        cv2.imshow("mask", mask)
+        cv2.waitKey(0)
+        cv2.destroyWindow("mask")
+
+    # Filter out contours of wrong size
+    # Calculate centres for the remaining contours
+    cnts, _ = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    if _DEBUG:
+        image = img.copy()
+        cv2.drawContours(image, cnts, -1, (255,255,0), 2)
+        cv2.imshow("contours", image)
+        cv2.waitKey(0)
+        cv2.destroyWindow("contours")
+        image = img.copy()
+
+
+    centres = []
+    areas = []
+    for c in cnts:
+        M = cv2.moments(c)
+        area = M['m00']
+        _DEBUG and print(area)
+        if area > 50 and area < 400:
+            centre = (M['m10']/M['m00'], M['m01']/M['m00'])
+            centre = np.array(centre)
+            centres.append(centre)
+            areas.append(area)
+            _DEBUG and cv2.drawContours(image, [c], -1, (255,255,0), 2)
+    
+    if _DEBUG:
+        print(centres)
+        cv2.imshow("filtered", image)
+        cv2.waitKey(0)
+        cv2.destroyWindow("filtered")
+
+
+    # Use the estimated locations from waypoints.py
+    # Get the nearest contours to the estimates
+    blues = []
+    reds = []
+    shift, invmat, mat = get_shift_invmat_mat(img)
+    from waypoints import BLUE_DROPOFFS_T, RED_DROPOFFS_T, untransform_board
+    for i,t in enumerate(np.append(BLUE_DROPOFFS_T, RED_DROPOFFS_T, axis=0)):
+        # Yes this is inefficient, but it's only ever run once or twice.
+        est = untransform_board(shift, invmat, t)
+        vecs = centres - est
+        mags = np.linalg.norm(vecs, axis=1)
+        j = np.argmin(mags)
+        assert mags[j] < 40, "Couldn't find valid box within 40px of estimate"
+        if i < 2:
+            blues.append(centres[j])
+        else:
+            reds.append(centres[j])
+    return blues, reds
 
 def get_shift_invmat_mat(image: np.ndarray):
     """Get the shift vector, inverse matrix, and forward matrix for
@@ -247,6 +337,24 @@ def _pick_points_normalised():
     # close the window
     cv2.destroyAllWindows()
 
+def _test_dropoff_boxes():
+    from unfisheye import undistort
+
+    image = cv2.imread('new_board/1.jpg')
+    # image = cv2.imread('dots/dot4.jpg')
+    # image = cv2.imread('checkerboard2/3.jpg')
+
+    image = undistort(image)
+    
+    for i,group in enumerate(dropoff_boxes(image)):
+        for p in group:
+            cv2.drawMarker(image, np.int0(p), (255,0,0) if i == 0 else (0,0,255),
+                           cv2.MARKER_CROSS, 40, 1)
+
+    cv2.imshow('image', image)
+    cv2.waitKey(0)
+
 if __name__=="__main__":
     # _pick_points()
-    _pick_points_normalised()
+    # _pick_points_normalised()
+    _test_dropoff_boxes()

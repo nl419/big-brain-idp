@@ -30,7 +30,7 @@ if do_crop_table:
     image = crop_board(image, shift, invmat)
 if do_remove_shadow:
     image = remove_shadow(image, 101)
-image = cv2.resize(image, (image.shape[1]//2, image.shape[0]//2))
+# image = cv2.resize(image, (image.shape[1]//2, image.shape[0]//2))
 cv2.imshow("image", image)
 cv2.waitKey(0)
 if do_kmeans:

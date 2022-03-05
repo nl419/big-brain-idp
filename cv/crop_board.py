@@ -86,7 +86,6 @@ def remove_shadow(image: np.ndarray, k: int = 201):
     np.ndarray
         Image without spotlights / shadows
     """
-    k = 201
     inverted = cv2.bitwise_not(image)
     rgb_planes = cv2.split(inverted)
 
