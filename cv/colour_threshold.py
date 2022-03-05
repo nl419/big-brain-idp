@@ -8,18 +8,29 @@ import numpy as np
 def nothing(x):
     pass
 
-invert_hue = True
+invert_hue = False
 
 # Load in image
-image = cv2.imread('dots/dot9.jpg')
-# Optionally undistort the image
+# image = cv2.imread('new_board/1.jpg')
+image = cv2.imread('dots/dot3.jpg')
+# image = cv2.imread('checkerboard2/3.jpg')
+
+# Preprocess
 from unfisheye import undistort
+from crop_board import crop_board, remove_shadow, kmeans
+from find_coords import get_shift_invmat_mat
 image = undistort(image)
+# image = remove_shadow(image)
+# cv2.imshow("image", image)
+# cv2.waitKey(0)
+# image = kmeans(image, 14)
+# shift, invmat, _ = get_shift_invmat_mat(image)
+
 
 SHOW_MASK = False # False => show entire image after threshold, True => just show mask
 
 # Set initial values
-hMin = 17; sMin = 113; vMin = 139; hMax = 49; sMax = 255; vMax = 255
+hMin = 17; sMin = 81; vMin = 97; hMax = 49; sMax = 255; vMax = 255
 
 # Create a window, scale it to fit screen
 win = cv2.namedWindow('image', cv2.WINDOW_GUI_NORMAL)
