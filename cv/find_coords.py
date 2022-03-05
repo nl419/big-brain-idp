@@ -219,9 +219,9 @@ def _pick_points_normalised():
 
     # Return the points normalised by the barrier positions
 
-    # image = cv2.imread('new_board/1.jpg')
+    image = cv2.imread('new_board/1.jpg')
     # image = cv2.imread('dots/dot4.jpg')
-    image = cv2.imread('checkerboard2/3.jpg')
+    # image = cv2.imread('checkerboard2/3.jpg')
 
     image = undistort(image)
     image2 = image.copy()
@@ -235,7 +235,7 @@ def _pick_points_normalised():
     image = crop_board(image, shift, invmat)
 
     # displaying the image
-    cv2.imshow('image', image)
+    cv2.imshow('image', remove_shadow(image))
 
     # setting mouse handler for the image
     # and calling the click_event() function
