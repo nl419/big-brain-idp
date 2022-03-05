@@ -209,6 +209,13 @@ class Waypoint:
 def untransform_waypoints(shift, invmat, transformed):
     return np.matmul(invmat, transformed) + shift
 
+BOARD_CORNERS_T = np.array((
+    (-0.04257, -2.39275),
+    (-2.36891, -0.01291),
+    (-0.06849, 2.59533),
+    (2.55669, -0.03823)
+))
+
 BLUE_CORNER_T = np.array((-1.88769, 0.01154))
 RED_CORNER_T = np.array((2.05079, -0.00796))
 PICKUP_CROSS_T = np.array((-0.04367, 1.02938))
@@ -240,6 +247,15 @@ HOME_T = np.array((-0.02170, -1.78574))
 
 # =====================================================================
 # =====================================================================
+
+def get_board_corners(shift, invmat):
+    return np.array((
+        untransform_waypoints(shift, invmat, BOARD_CORNERS_T[0]),
+        untransform_waypoints(shift, invmat, BOARD_CORNERS_T[1]),
+        untransform_waypoints(shift, invmat, BOARD_CORNERS_T[2]),
+        untransform_waypoints(shift, invmat, BOARD_CORNERS_T[3])
+    ))
+
 
 def generate_waypoints(shift, invmat):
 
