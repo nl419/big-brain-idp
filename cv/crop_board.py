@@ -155,8 +155,9 @@ def _test_crop():
     """Test cropping into the board and into the pickup area"""
     from find_coords import get_shift_invmat_mat
     from unfisheye import undistort
-    image = cv2.imread("dots/dot2.jpg")
+    image = cv2.imread("dots/dot7.jpg")
     image = undistort(image)
+    image = remove_shadow(image)
     shift, invmat, _ = get_shift_invmat_mat(image)
     crop_board(image, shift, invmat)
     cv2.destroyAllWindows()

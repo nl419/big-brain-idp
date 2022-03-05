@@ -9,29 +9,38 @@ def nothing(x):
     pass
 
 invert_hue = False
-do_crop_table = True
-do_remove_shadow = True
-do_kmeans = True
+do_crop_board = True
+do_crop_pickup = False
+do_blur = False
+do_remove_shadow = False
+do_kmeans = False
+do_erode = False
 
 # Load in image
 # image = cv2.imread('new_board/1.jpg')
 # image = cv2.imread('dots/dot3.jpg')
-image = cv2.imread('checkerboard2/3.jpg')
+image = cv2.imread('dots/dot7.jpg')
+# image = cv2.imread('checkerboard2/3.jpg')
 
 # Preprocess
 from unfisheye import undistort
-from crop_board import crop_board, remove_shadow, kmeans
+from crop_board import crop_board, remove_shadow, kmeans, get_pickup_corners
 from find_coords import get_shift_invmat_mat
 image = undistort(image)
-if do_crop_table:
+if do_crop_board or do_crop_pickup:
     image2 = image.copy()
     image2 = remove_shadow(image2)
     shift, invmat, _ = get_shift_invmat_mat(image2)
-    image = crop_board(image, shift, invmat)
+    if do_crop_pickup:
+        image = crop_board(image, shift, invmat, get_pickup_corners(shift, invmat))
+    else:
+        image = crop_board(image, shift, invmat)
+if do_blur:
+    image = cv2.blur(image, (5,5))
 if do_remove_shadow:
     image = remove_shadow(image, 101)
-# image = cv2.resize(image, (image.shape[1]//2, image.shape[0]//2))
-cv2.imshow("image", image)
+temp = cv2.resize(image, (image.shape[1]//2, image.shape[0]//2))
+cv2.imshow("image", temp)
 cv2.waitKey(0)
 if do_kmeans:
     image = kmeans(image, 4)
@@ -40,10 +49,10 @@ if do_kmeans:
 
 
 
-SHOW_MASK = True # False => show entire image after threshold, True => just show mask
+SHOW_MASK = False # False => show entire image after threshold, True => just show mask
 
 # Set initial values
-hMin = 0; sMin = 0; vMin = 70; hMax = 179; sMax = 80; vMax = 255
+hMin = 0; sMin = 100; vMin = 80; hMax = 179; sMax = 255; vMax = 255
 
 # Create a window, scale it to fit screen
 # win = cv2.namedWindow('image', cv2.WINDOW_GUI_NORMAL + cv2.WINDOW_NORMAL)
@@ -106,6 +115,9 @@ while(1):
         hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
         mask = cv2.inRange(hsv, lower, upper)
     
+    if do_erode:
+        cv2.erode(mask, (5,5), iterations=5)
+        cv2.dilate(mask, (5,5), iterations=5)
     output = cv2.bitwise_and(image,image, mask= mask)
 
     # Print if there is a change in HSV value

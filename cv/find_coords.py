@@ -84,6 +84,7 @@ def barrier_centres(image: np.ndarray):
     """
     # Only pickup the yellow parts
     # Filter out small areas
+    # Filter out areas with small length
     # Pick the two contours which are closest to the middle
     # hMin = 17; sMin = 81; vMin = 97; hMax = 49; sMax = 255; vMax = 255
     hMin = 20; sMin = 20; vMin = 20; hMax = 50; sMax = 255; vMax = 255
@@ -109,8 +110,9 @@ def barrier_centres(image: np.ndarray):
     for c in cnts:
         M = cv2.moments(c)
         area = M['m00']
-        _DEBUG and print(area)
-        if area > 800:
+        _,radius = cv2.minEnclosingCircle(c)
+        _DEBUG and print(area, radius)
+        if area > 800 and radius > 80:
             centre = (M['m10']/M['m00'], M['m01']/M['m00'])
             centre = np.array(centre) - middle
             centres.append(centre)
@@ -309,7 +311,7 @@ def _pick_points_normalised():
 
     # Return the points normalised by the barrier positions
 
-    image = cv2.imread('new_board/1.jpg')
+    image = cv2.imread('dots/dot7.jpg')
     # image = cv2.imread('dots/dot4.jpg')
     # image = cv2.imread('checkerboard2/3.jpg')
 
@@ -356,5 +358,5 @@ def _test_dropoff_boxes():
 
 if __name__=="__main__":
     # _pick_points()
-    # _pick_points_normalised()
-    _test_dropoff_boxes()
+    _pick_points_normalised()
+    # _test_dropoff_boxes()
