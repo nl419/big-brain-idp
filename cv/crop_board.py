@@ -68,20 +68,25 @@ def crop_board(image: np.ndarray, shift: np.ndarray, invmat: np.ndarray,
         cv2.destroyAllWindows()
     return cropped
 
-def remove_shadow(image: np.ndarray):
-    """Remove the lightspots / shadows from an image of the board.
-    Works best if the image is already cropped into the board
+def remove_shadow(image: np.ndarray, k: int = 201):
+    """Remove the spotlights / shadows from an image of the board.
+    Works best if the image is already cropped into the board.
+    Known issue: if k is less than < 150, the purple tracking dots will have
+    a large green smear added to them (they are detected as spotlights)
 
     Parameters
     ----------
     image : np.ndarray
-        Image to remove lightspots / shadows from
+        Image to remove spotlights / shadows from
+    k : int
+        The characteristic size of the spotlights / shadows
 
     Returns
     -------
     np.ndarray
-        Image without lightspots / shadows
+        Image without spotlights / shadows
     """
+    k = 201
     inverted = cv2.bitwise_not(image)
     rgb_planes = cv2.split(inverted)
 
@@ -89,7 +94,7 @@ def remove_shadow(image: np.ndarray):
     result_norm_planes = []
     for plane in rgb_planes:
         dilated_img = cv2.dilate(plane, np.ones((7,7), np.uint8))
-        bg_img = cv2.medianBlur(dilated_img, 101)
+        bg_img = cv2.medianBlur(dilated_img, k)
         diff_img = 255 - cv2.absdiff(plane, bg_img)
         norm_img = cv2.normalize(diff_img,None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_8UC1)
         result_planes.append(diff_img)
