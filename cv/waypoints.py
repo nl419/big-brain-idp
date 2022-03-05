@@ -1,9 +1,7 @@
 import numpy as np
 from navigation import FORWARD, BACKWARD, LEFT, RIGHT, ROTATION_SPEED, MOVEMENT_SPEED
 from find_dots import untransform_coords, get_CofR, get_true_front, perp, angle
-
-# Realigning halfway will be done by making another waypoint halfway there
-# with very sloppy position tolerance
+from find_coords import untransform_board
 
 class Waypoint:
     _target_pos: np.ndarray
@@ -206,9 +204,6 @@ class Waypoint:
 
         return None, 0
 
-def untransform_waypoints(shift, invmat, transformed):
-    return np.matmul(invmat, transformed) + shift
-
 BOARD_CORNERS_T = np.array((
     (-0.04257, -2.39275),
     (-2.36891, -0.01291),
@@ -250,43 +245,43 @@ HOME_T = np.array((-0.02170, -1.78574))
 
 def get_board_corners(shift, invmat):
     return np.array((
-        untransform_waypoints(shift, invmat, BOARD_CORNERS_T[0]),
-        untransform_waypoints(shift, invmat, BOARD_CORNERS_T[1]),
-        untransform_waypoints(shift, invmat, BOARD_CORNERS_T[2]),
-        untransform_waypoints(shift, invmat, BOARD_CORNERS_T[3])
+        untransform_board(shift, invmat, BOARD_CORNERS_T[0]),
+        untransform_board(shift, invmat, BOARD_CORNERS_T[1]),
+        untransform_board(shift, invmat, BOARD_CORNERS_T[2]),
+        untransform_board(shift, invmat, BOARD_CORNERS_T[3])
     ))
 
 
 def generate_waypoints(shift, invmat):
 
-    BLUE_CORNER = untransform_waypoints(shift, invmat, BLUE_CORNER_T)
-    RED_CORNER = untransform_waypoints(shift, invmat, RED_CORNER_T)
-    PICKUP_CROSS = untransform_waypoints(shift, invmat, PICKUP_CROSS_T)
-    DROPOFF_CROSS = untransform_waypoints(shift, invmat, DROPOFF_CROSS_T)
+    BLUE_CORNER = untransform_board(shift, invmat, BLUE_CORNER_T)
+    RED_CORNER = untransform_board(shift, invmat, RED_CORNER_T)
+    PICKUP_CROSS = untransform_board(shift, invmat, PICKUP_CROSS_T)
+    DROPOFF_CROSS = untransform_board(shift, invmat, DROPOFF_CROSS_T)
 
     BRIDGE_MIDDLE = (PICKUP_CROSS + DROPOFF_CROSS) / 2
 
     BLUE_DROPOFFS = np.array((
-        untransform_waypoints(shift, invmat, BLUE_DROPOFFS_T[0]),
-        untransform_waypoints(shift, invmat, BLUE_DROPOFFS_T[1])
+        untransform_board(shift, invmat, BLUE_DROPOFFS_T[0]),
+        untransform_board(shift, invmat, BLUE_DROPOFFS_T[1])
     ))
     RED_DROPOFFS = np.array((
-        untransform_waypoints(shift, invmat, RED_DROPOFFS_T[0]),
-        untransform_waypoints(shift, invmat, RED_DROPOFFS_T[1])
+        untransform_board(shift, invmat, RED_DROPOFFS_T[0]),
+        untransform_board(shift, invmat, RED_DROPOFFS_T[1])
     ))
 
     # Intermediate waypoints
-    BLUE_POINT_PICKUP = untransform_waypoints(shift, invmat, BLUE_POINT_PICKUP_T)
-    BLUE_POINT_DROPOFF = untransform_waypoints(shift, invmat, BLUE_POINT_DROPOFF_T)
-    BLUE_POINT_BOX1 = untransform_waypoints(shift, invmat, BLUE_POINT_BOX1_T)
-    BLUE_POINT_BOX2 = untransform_waypoints(shift, invmat, BLUE_POINT_BOX2_T)
+    BLUE_POINT_PICKUP = untransform_board(shift, invmat, BLUE_POINT_PICKUP_T)
+    BLUE_POINT_DROPOFF = untransform_board(shift, invmat, BLUE_POINT_DROPOFF_T)
+    BLUE_POINT_BOX1 = untransform_board(shift, invmat, BLUE_POINT_BOX1_T)
+    BLUE_POINT_BOX2 = untransform_board(shift, invmat, BLUE_POINT_BOX2_T)
 
-    RED_POINT_PICKUP = untransform_waypoints(shift, invmat, RED_POINT_PICKUP_T)
-    RED_POINT_DROPOFF = untransform_waypoints(shift, invmat, RED_POINT_DROPOFF_T)
-    RED_POINT_BOX1 = untransform_waypoints(shift, invmat, RED_POINT_BOX1_T)
-    RED_POINT_BOX2 = untransform_waypoints(shift, invmat, RED_POINT_BOX2_T)
+    RED_POINT_PICKUP = untransform_board(shift, invmat, RED_POINT_PICKUP_T)
+    RED_POINT_DROPOFF = untransform_board(shift, invmat, RED_POINT_DROPOFF_T)
+    RED_POINT_BOX1 = untransform_board(shift, invmat, RED_POINT_BOX1_T)
+    RED_POINT_BOX2 = untransform_board(shift, invmat, RED_POINT_BOX2_T)
 
-    HOME = untransform_waypoints(shift, invmat, HOME_T)
+    HOME = untransform_board(shift, invmat, HOME_T)
 
     ZEROS = np.array((0,0))
     MECHANISM = np.array((1,0)) # Location of mechanism relative to robot pov

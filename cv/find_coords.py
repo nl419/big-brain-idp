@@ -79,11 +79,12 @@ def barrier_centres(image: np.ndarray):
     
     # Find contours of correct area
     cnts, _ = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-    cv2.drawContours(image, cnts, -1, (255,255,0), 3)
     middle = np.array((image.shape[1], image.shape[0])) / 2
-    cv2.circle(image, np.int0(middle), 10, (0,255,0), 3)
-    _DEBUG and cv2.imshow("image", image)
-    _DEBUG and cv2.waitKey(0)
+    if _DEBUG:
+        cv2.drawContours(image, cnts, -1, (255,255,0), 3)
+        cv2.circle(image, np.int0(middle), 10, (0,255,0), 3)
+        cv2.imshow("image", image)
+        cv2.waitKey(0)
     centres = []
     areas = []
     for c in cnts:
@@ -102,9 +103,75 @@ def barrier_centres(image: np.ndarray):
 
     return centres + middle
 
-from unfisheye import undistort
+def get_shift_invmat_mat(image: np.ndarray):
+    """Get the shift vector, inverse matrix, and forward matrix for
+    transformation between camera coords and normalised board coords.
+
+    Parameters
+    ----------
+    image : np.ndarray
+        The image to process (without distortion)
+
+    Returns
+    -------
+    shift, invmat, mat : np.ndarray
+        Shift, inverse matrix, and forward matrix for transformation.
+    """
+    centres = barrier_centres(image)
+    shift = (centres[0] + centres[1]) / 2
+    # c = bottom right barrier centroid - shift
+    c = centres[0] - shift
+    c = c if c[0] > 0 else centres[1] - shift
+    # Map to normalised coordinates
+    mat = np.array(((c[0], c[1]), (-c[1], c[0]))) / (c[0]**2 + c[1]**2)
+    # Map from normalised coordinates
+    invmat = np.array(((c[0], -c[1]), (c[1], c[0])))
+    if __name__ == "__main__":
+        print(centres)
+        cv2.circle(image, np.int0(centres[0]), 5, (255,0,0), -1)
+        cv2.circle(image, np.int0(centres[1]), 5, (255,0,0), -1)
+    return shift, invmat, mat
+
+def transform_board(shift: np.ndarray, mat: np.ndarray, x: np.ndarray):
+    """Return the normalised board coordinates from camera coordinates
+
+    Parameters
+    ----------
+    shift : np.ndarray
+        The shift vector found with get_shift_invmat_mat()
+    mat : np.ndarray
+        The matrix found with get_shift_invmat_mat()
+    x : np.ndarray
+        Camera coordinates to transform
+
+    Returns
+    -------
+    np.ndarray
+        Transformed coordinates
+    """
+    return np.matmul(mat, x - shift)
+
+def untransform_board(shift: np.ndarray, invmat: np.ndarray, transformed :np.ndarray):
+    """Return the camera coordinates from normalised board coordinates
+
+    Parameters
+    ----------
+    shift : np.ndarray
+        The shift vector found with get_shift_invmat_mat()
+    invmat : np.ndarray
+        The inverse matrix found with get_shift_invmat_mat()
+    transformed : np.ndarray
+        Normalised board coordinates to untransform
+
+    Returns
+    -------
+    np.ndarray
+        Camera coords corresponding to the transformed coords
+    """
+    return np.matmul(invmat, transformed) + shift
 
 def _pick_points():
+    from unfisheye import undistort
     # reading the image
     image = cv2.imread('checkerboard2/3.jpg', 1)
     image = undistort(image)
@@ -123,21 +190,12 @@ def _pick_points():
     cv2.destroyAllWindows()
 
 def _pick_points_normalised():
+    from unfisheye import undistort
     # Return the points normalised by the barrier positions
     # image = cv2.imread('dots/dot4.jpg', 1)
     image = cv2.imread('checkerboard2/3.jpg', 1)
     image = undistort(image)
-
-    centres = barrier_centres(image)
-    shift = (centres[0] + centres[1]) / 2
-    # c = bottom right barrier centroid - shift
-    c = centres[0] - shift
-    c = c if c[0] > 0 else centres[1] - shift
-    mat = np.array(((c[0], c[1]), (-c[1], c[0]))) / (c[0]**2 + c[1]**2)
-    print(centres)
-
-    cv2.circle(image, np.int0(centres[0]), 5, (255,0,0), -1)
-    cv2.circle(image, np.int0(centres[1]), 5, (255,0,0), -1)
+    shift, _, mat = get_shift_invmat_mat(image)
 
     # displaying the image
     cv2.imshow('image', image)
@@ -152,18 +210,6 @@ def _pick_points_normalised():
     # close the window
     cv2.destroyAllWindows()
 
-    # dot4.jpg
-    # real coords 712, 353   transformed coords 0.59870, -0.75853
-    # real coords 602, 101   transformed coords -0.63577, -1.18904
-    # real coords 344, 510   transformed coords -0.04266, 1.03243
-
-    # checkerboard2/3.jpg
-    # real coords 713, 354   transformed coords 0.60051, -0.75271
-    # real coords 603, 101   transformed coords -0.63574, -1.18360
-    # real coords 346, 509   transformed coords -0.04045, 1.02590
-
-
-# driver function
 if __name__=="__main__":
     # _pick_points()
     _pick_points_normalised()
