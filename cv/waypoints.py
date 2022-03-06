@@ -204,6 +204,20 @@ class Waypoint:
             return command, abs(trans) / MOVEMENT_SPEED
 
         return None, 0
+    
+    def draw(self, image: np.ndarray, colour: tuple = (0,255,0)):
+        """Draw the marker onto the image, showing position of waypoint,
+        orientation of waypoint, and tolerances for each.
+
+        Parameters
+        ----------
+        image : np.ndarray
+            Image to mark
+        colour : tuple, optional
+            Colour of the markers, by default (0,255,0)
+        """
+        cv2.drawMarker(image, np.int0(self._target_pos), colour, cv2.MARKER_CROSS, 30, 2)
+        cv2.circle(image, np.int0(self._target_pos), self._pos_tol, colour, 2)
 
 BLUE_CORNER_T = np.array((-1.88769, 0.01154))
 RED_CORNER_T = np.array((2.05079, -0.00796))
