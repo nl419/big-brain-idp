@@ -160,8 +160,8 @@ def _test_rectangle_orientation():
 def _test_find_block():
     # Find blocks in the pickup area of still images
 
-    image = cv2.imread("checkerboard2/3.jpg")
-    # image = cv2.imread("block_ims/red-diag.jpg")
+    # image = cv2.imread("checkerboard2/3.jpg")
+    image = cv2.imread("block_ims/red-diag.jpg")
     image = undistort(image)
     im2 = remove_shadow(image.copy())
     shift, invmat, mat = get_shift_invmat_mat(im2)
