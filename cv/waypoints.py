@@ -7,8 +7,8 @@ import cv2
 class Waypoint:
     _target_pos: np.ndarray
     _target_orient: np.ndarray # which way the true forward dir should point, always unit length
-    _pos_tol: float
-    _orient_tol: float
+    _pos_tol: float # pixels
+    _orient_tol: float # radians
     _orient_backward_ok: bool
     _move_backward_ok: bool
 
@@ -31,7 +31,7 @@ class Waypoint:
         pos_tol : float
             Tolerance for being "at" the target position
         orient_tol : float
-            Tolerance for being "parallel" to the target orientation
+            Tolerance for being "parallel" to the target orientation in degrees
         robot_offset : np.ndarray
             The point on the robot to move to the target (in robot's coord system)
         orient_backward_ok : bool, optional
@@ -46,7 +46,7 @@ class Waypoint:
         else:
             self._target_orient = target_orient / np.linalg.norm(target_orient)
         self._pos_tol = pos_tol
-        self._orient_tol = orient_tol
+        self._orient_tol = np.radians(orient_tol)
         self._robot_offset = robot_offset
         self._orient_backward_ok = orient_backward_ok
         self._move_backward_ok = move_backward_ok
@@ -207,7 +207,7 @@ class Waypoint:
     
     def draw(self, image: np.ndarray, colour: tuple = (0,255,0)):
         """Draw the marker onto the image, showing position of waypoint,
-        orientation of waypoint, and tolerances for each.
+        orientation of waypoint (if specified), and tolerances for each.
 
         Parameters
         ----------
@@ -216,8 +216,29 @@ class Waypoint:
         colour : tuple, optional
             Colour of the markers, by default (0,255,0)
         """
-        cv2.drawMarker(image, np.int0(self._target_pos), colour, cv2.MARKER_CROSS, 30, 2)
-        cv2.circle(image, np.int0(self._target_pos), self._pos_tol, colour, 2)
+        # Draw target_pos and pos_tol
+        start = np.int0(self._target_pos)
+        cv2.drawMarker(image, start, colour, cv2.MARKER_CROSS, 30, 2)
+        cv2.circle(image, start, self._pos_tol, colour, 2)
+
+        forward = np.array((1,0))
+        if self._target_orient is not None:
+            # Draw target orientation
+            end = np.int0(self._target_pos + self._target_orient * 50)
+            cv2.arrowedLine(image, start, end, colour, 4)
+            forward = self._target_orient
+        # Draw orientation tolerance
+        sin = np.sin(self._orient_tol)
+        cos = np.cos(self._orient_tol)
+        rot_mat = np.array(((cos, sin), (-sin, cos)))
+        inv_rot_mat = np.array(((cos, -sin), (sin, cos)))
+        orient_rot = np.matmul(rot_mat, forward)
+        orient_inv_rot = np.matmul(inv_rot_mat, forward)
+        end = np.int0(self._target_pos + orient_rot * 50)
+        cv2.line(image, start, end, colour, 2)
+        end = np.int0(self._target_pos + orient_inv_rot * 50)
+        cv2.line(image, start, end, colour, 2)
+
 
 BLUE_CORNER_T = np.array((-1.88769, 0.01154))
 RED_CORNER_T = np.array((2.05079, -0.00796))
