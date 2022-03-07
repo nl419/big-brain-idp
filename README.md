@@ -1,8 +1,6 @@
 # big-brain-idp
 BIG BRAINS ONLY
 
-PLEASE LEAVE IF YOUR BRAIN SMOL OR PP
-
 Please use the NumPy format for Docstrings.
 https://numpydoc.readthedocs.io/en/latest/format.html
 
@@ -32,11 +30,23 @@ The changes are now synced with the online repo! See https://github.com/nl419/bi
 
 ## TODO list
 
+Software:
+
 - [x] Redo checkerboard calibration
 - [x] Track orientation
-- [ ] Make tracking robust vs lighting changes
+- [x] Make tracking robust vs lighting changes
 - [ ] Track blocks
 - [ ] Track target locations
-- [ ] Navigation code
+- [x] Navigation code
 - [x] Arduino WiFi code
-- [ ] Laptop WiFi code
+- [x] Laptop WiFi code
+
+Electrical:
+
+- [ ] LED display
+- [ ] Colour detector
+
+Mechanical:
+
+- [ ] Final chassis
+- [ ] Block shover

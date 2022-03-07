@@ -2,12 +2,12 @@
 
 import cv2
 
-folder = "dots"
+folder = "new_board"
 
 print ("starting grab")
-cap = cv2.VideoCapture('http://localhost:8081/stream/video.mjpeg')
-prefix = "dot"
-counter = 12
+cap = cv2.VideoCapture('http://localhost:8082/stream/video.mjpeg')
+prefix = ""
+counter = 1
 while True:
     ret, frame = cap.read()
     cv2.imshow('Video', frame)
