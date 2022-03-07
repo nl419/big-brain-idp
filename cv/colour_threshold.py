@@ -4,6 +4,7 @@
 import cv2
 import sys
 import numpy as np
+from unfisheye import undistort
 
 def nothing(x):
     pass
