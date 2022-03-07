@@ -10,16 +10,16 @@ def nothing(x):
 
 invert_hue = False
 do_crop_board = True
-do_crop_pickup = False
+do_crop_pickup = True
 do_blur = False
 do_remove_shadow = False
 do_kmeans = False
 do_erode = False
 
 # Load in image
-# image = cv2.imread('new_board/1.jpg')
+image = cv2.imread('block_ims/2.jpg')
 # image = cv2.imread('dots/dot3.jpg')
-image = cv2.imread('dots/dot7.jpg')
+# image = cv2.imread('dots/dot7.jpg')
 # image = cv2.imread('checkerboard2/3.jpg')
 
 # Preprocess
@@ -52,7 +52,7 @@ if do_kmeans:
 SHOW_MASK = False # False => show entire image after threshold, True => just show mask
 
 # Set initial values
-hMin = 0; sMin = 100; vMin = 80; hMax = 179; sMax = 255; vMax = 255
+hMin = 40; sMin = 100; vMin = 80; hMax = 140; sMax = 255; vMax = 255
 
 # Create a window, scale it to fit screen
 # win = cv2.namedWindow('image', cv2.WINDOW_GUI_NORMAL + cv2.WINDOW_NORMAL)
