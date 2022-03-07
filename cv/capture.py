@@ -2,12 +2,12 @@
 
 import cv2
 
-folder = "block_ims"
+folder = "dots"
 
 print ("starting grab")
 cap = cv2.VideoCapture('http://localhost:8081/stream/video.mjpeg')
-prefix = ""
-counter = 1
+prefix = "dot"
+counter = 17
 while True:
     ret, frame = cap.read()
     cv2.imshow('Video', frame)

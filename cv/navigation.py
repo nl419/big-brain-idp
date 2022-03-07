@@ -381,7 +381,7 @@ def go_to_coord_orient (centre: np.ndarray, end: np.ndarray, front: np.ndarray,
         return get_precise_translation(mag_disp)
     return command, duration
 
-ip = "http://192.168.137.198"
+ip = "http://192.168.137.152"
 
 SEND_COMMANDS = True # whether to attempt to send commands to the ip address
 MIN_COMMAND_INTERVAL = 1000 # in ms
@@ -713,6 +713,8 @@ def _test_calibrate():
 
 def _test_waypoints():
     from waypoints import generate_waypoints
+    from find_coords import get_shift_invmat_mat
+    from crop_board import remove_shadow
     video = DotPatternVideo('http://localhost:8081/stream/video.mjpeg')
     cv2.namedWindow("Tracking", cv2.WINDOW_NORMAL)
     old_centre = np.array([100,100])
@@ -720,25 +722,30 @@ def _test_waypoints():
     TOL_STATIONARY = 3
 
     getString = ip + "/TRIGGER/0/0///"
-    lastString = getString
     command = (0,0)
     duration = 0
-    lastCommand = command
     # Time at which we will send a new command to the robot
     next_command_time = round(time.time() * 1000) + 3000
-    frame, found, centre, front = video.find()
+
+    # Get the shift and invmat
+    frame, found, centre, front = video.find(annotate=False)
+    # frame = remove_shadow(frame, 101)
+    shift, invmat, _ = get_shift_invmat_mat(frame)
     
-    blues, reds, bridge, home = generate_waypoints()
-    
-    # Time at which the robot will think it's stuck if no movement detected
-    stuck_time = round(time.time() * 1000) + 4000
-    not_stuck_pos = old_centre # The last position at which stuck = False
-    stuck_counter = 0 # The number of times the robot has been stuck
-    stuck = False # Whether it is currently stuck
+    # Get the waypoints
+    blues, reds, bridge, home = generate_waypoints(shift=shift, invmat=invmat)
+    wps = blues[0]
+    wp_counter = 0
+
+    for wp in wps:
+        wp.draw(frame)
+
+    cv2.imshow("Tracking", frame)
+    cv2.waitKey(0)
 
     while True:
-        frame, found, centre, front = video.find()
-        frame = draw_waypoints(frame)
+        frame, found, centre, front = video.find(shift=shift, invmat=invmat)
+        wps[wp_counter].draw(frame)
         if found:
             # Make sure commands aren't sent while the bot is moving
             distance = np.linalg.norm(old_centre - centre)
@@ -749,39 +756,16 @@ def _test_waypoints():
             # Make sure commands aren't sent too rapidly
             current_time = round(time.time() * 1000)
 
-            # If the robot isn't supposed to move, then stuck = false
-            # If the robot has moved from its last non-stuck position
-                # stuck = false
-            # If it has been 5s since a non-zero command was sent,
-            # and the robot hasn't moved far away from its last non-stuck position
-                # stuck = true
-            if lastCommand[0] == 0 and lastCommand[1] == 0:
-                print("Not supposed to move")
-                stuck = False
-                not_stuck_pos = centre
-                stuck_time = current_time + STUCK_TIMEOUT
-            elif np.linalg.norm(centre - not_stuck_pos) > 10:
-                print("Stuckn't")
-                stuck = False
-                not_stuck_pos = centre
-                stuck_time = current_time + STUCK_TIMEOUT
-            elif current_time > stuck_time:
-                print("Stuck detected")
-                stuck = True
-            
             if current_time > next_command_time:
                 # Reset command to None
                 command = None
-                if stuck:
-                    print("Getting stuck command")
-                    command, duration = STUCK_COMMANDS[stuck_counter]
-                    stuck_counter = (stuck_counter + 1) % len(STUCK_COMMANDS)
-                elif distance < TOL_STATIONARY:
+                if distance < TOL_STATIONARY:
                     print("Getting normal command")
-                    command, duration = cross_bridge(centre, front, go_to_dropoff_side)
+                    command, duration = wps[wp_counter].get_command(centre, front)
                     if command is None:
-                        go_to_dropoff_side = not go_to_dropoff_side
-                        command, duration = cross_bridge(centre, front, go_to_dropoff_side)
+                        print("Waypoint returned none, getting next one")
+                        wp_counter += 1
+                        command, duration = wps[wp_counter].get_command(centre, front)
                 if command is not None and duration > 0.005:
                     # Turn that into a getString
                     duration *= 1000 # Turn s into ms
@@ -801,8 +785,6 @@ def _test_waypoints():
                     print("sending new command")
                     print(getString)
                     next_command_time = current_time + duration + MIN_COMMAND_INTERVAL
-                    lastCommand = command
-                    lastString = getString
             cv2.circle(frame, np.int0(get_CofR(centre, front)), 5, (255,255,0),-1)
         cv2.imshow("Tracking", frame)
 
@@ -816,8 +798,9 @@ def _test_waypoints():
 
 if __name__ == "__main__":
     # _test_go_to_target()
-    _test_go_loop()
+    # _test_go_loop()
     # _test_calibrate()
+    _test_waypoints()
     # a0 = np.array((1,0))
     # a1 = np.array((0,1))
     # b0 = np.array((0,1))

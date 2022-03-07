@@ -16,8 +16,8 @@ class Waypoint:
     # target_pos
     _robot_offset: np.ndarray
 
-    def __init__(self, target_pos: np.ndarray, target_orient: np.ndarray or None, 
-                 pos_tol: float, orient_tol: float, robot_offset: np.ndarray, 
+    def __init__(self, target_pos: np.ndarray, target_orient: np.ndarray = None, 
+                 pos_tol: float = 10, orient_tol: float = 5, robot_offset: np.ndarray = np.array((0,0)), 
                  orient_backward_ok: bool = False, move_backward_ok: bool = True):
         """A waypoint on the board. Run [Waypoint object].get_command(centre, front) 
         to get the next command & duration
@@ -26,14 +26,14 @@ class Waypoint:
         ----------
         target_pos : np.ndarray
             Coordinates (x,y) of the target
-        target_orient : np.ndarray | None
-            Vector (x,y) to align with the true front direction of the robot
+        target_orient : np.ndarray or None
+            Vector (x,y) to align with the true front direction of the robot, default None
         pos_tol : float
-            Tolerance for being "at" the target position
+            Tolerance for being "at" the target position, default 10
         orient_tol : float
-            Tolerance for being "parallel" to the target orientation in degrees
+            Tolerance for being "parallel" to the target orientation in degrees, default 5
         robot_offset : np.ndarray
-            The point on the robot to move to the target (in robot's coord system)
+            The point on the robot to move to the target (in robot's coord system), default (0,0)
         orient_backward_ok : bool, optional
             Whether aligning to the reverse orientation is ok, by default False
         move_backward_ok : bool, optional
@@ -242,8 +242,8 @@ class Waypoint:
 
 # _T means transformed coordinates (relative to the yellow barriers)
 
-BLUE_CORNER_T = np.array((-1.88769, 0.01154))
-RED_CORNER_T = np.array((2.05079, -0.00796))
+BLUE_CORNER_T = np.array((-2.08769, 0.01154))
+RED_CORNER_T = np.array((2.25079, -0.00796))
 PICKUP_CROSS_T = np.array((-0.04367, 1.02938))
 DROPOFF_CROSS_T = np.array((-0.04001, -0.98237))
 
@@ -262,14 +262,14 @@ HOME_T = np.array((-0.02170, -1.78574))
 
 ## Intermediate waypoints
 # Near corners on pickup / dropoff side
-BLUE_POINT_PICKUP_T = np.array((-1.43523, 0.49387))
-BLUE_POINT_DROPOFF_T = np.array((-1.44936, -0.44925))
+BLUE_POINT_PICKUP_T = np.array((-1.63523, 0.49387))
+BLUE_POINT_DROPOFF_T = np.array((-1.64936, -0.44925))
 # Near dropoff boxes
 BLUE_POINT_BOX1_T = np.array((-0.82942, -0.98781))
 BLUE_POINT_BOX2_T = np.array((-0.84395, -0.51035))
 
-RED_POINT_PICKUP_T = np.array((1.47270, 0.48527))
-RED_POINT_DROPOFF_T = np.array((1.46287, -0.51847))
+RED_POINT_PICKUP_T = np.array((1.67270, 0.48527))
+RED_POINT_DROPOFF_T = np.array((1.66287, -0.51847))
 RED_POINT_BOX1_T = np.array((0.79716, -1.04265))
 RED_POINT_BOX2_T = np.array((0.80650, -0.55608))
 

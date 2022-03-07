@@ -3,9 +3,11 @@ import numpy as np
 from find_qr import drawMarkers
 from unfisheye import undistort
 from laggy_video import VideoCapture
+from crop_board import crop_board
 
 # Flag to print debug information
 _DEBUG = __name__ == "__main__"
+_DRAW_MASKS = True and _DEBUG
 
 def getDotBbox(centres):
     """Given a list of centres of contours (of the correct area), returns
@@ -23,8 +25,8 @@ def getDotBbox(centres):
     bbox : np.ndarray or None
         The bounding box, if determined.
     """
-    minLength = 35
-    maxLength = 65
+    minLength = 30
+    maxLength = 75
     if len(centres) < 3:
         return False, None
     # Find a centre & corresponding pair of distance vectors which are perpendicular
@@ -44,7 +46,7 @@ def getDotBbox(centres):
             j = (i+1) % len(vecs)
             cross = np.cross(v, vecs[j]) / lengths[i] / lengths[j]
             _DEBUG and print(f"cross: {cross}")
-            if abs(cross) > 0.99: # <8 deg away from perp.
+            if abs(cross) > 0.98: # <16 deg away from perp.
                 break # Found.
         else:
             continue # No perp vectors found for this centre
@@ -76,12 +78,17 @@ def getDots(image: np.ndarray):
     """
     # Threshold hsv
     # hMin = 140; sMin = 90; vMin = 101; hMax = 166; sMax = 255; vMax = 255
-    hMin = 140; sMin = 42; vMin = 101; hMax = 166; sMax = 255; vMax = 255
+    hMin = 140; sMin = 42; vMin = 101; hMax = 170; sMax = 255; vMax = 255
     lower = np.array([hMin, sMin, vMin])
     upper = np.array([hMax, sMax, vMax])
     # Create HSV Image and threshold into a range.
     hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
     mask = cv2.inRange(hsv, lower, upper)
+    if _DRAW_MASKS:
+        cv2.imshow("mask", mask)
+        cv2.waitKey(0)
+        contim = image.copy()
+        filt_contim = image.copy()
     # Find contours of correct area
     cnts, _ = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
     centres = []
@@ -90,11 +97,18 @@ def getDots(image: np.ndarray):
         M = cv2.moments(c)
         area = M['m00']
         _DEBUG and print(area)
-        if area > 300 and area < 650:
+        _DRAW_MASKS and cv2.drawContours(contim, [c], -1, (0,255,0), 2)
+        if area > 250 and area < 700:
             centre = (M['m10']/M['m00'], M['m01']/M['m00'])
             centre = np.array(centre)
             centres.append(centre)
             areas.append(area)
+            _DRAW_MASKS and cv2.drawContours(filt_contim, [c], -1, (255,0,0), 2)
+    if _DRAW_MASKS:
+        cv2.imshow("Before filter", contim)
+        cv2.imshow("Filtered", filt_contim)
+        cv2.waitKey(0)
+
     return centres
 
 def transform_coords(x: np.ndarray, centre: np.ndarray, front: np.ndarray):
@@ -159,13 +173,13 @@ def untransform_coords(x: np.ndarray, centre: np.ndarray, front: np.ndarray):
     return np.matmul(mat, x) + centre
 
 def get_CofR(centre: np.ndarray, front: np.ndarray):
-    COFR_TRANSFORMED = np.array((0, -1))
-    # COFR_TRANSFORMED = np.array((-0.74257382, -0.13944251))
+    # COFR_TRANSFORMED = np.array((0, -1))
+    COFR_TRANSFORMED = np.array((-0.74257382, -0.13944251))
     return untransform_coords(COFR_TRANSFORMED, centre, front)
 
 def get_true_front(centre: np.ndarray, front:np.ndarray):
-    TRUE_FRONT_TRANSFORMED = np.array((1, 0))
-    # TRUE_FRONT_TRANSFORMED = np.array((3.31095469, 0.02314122))
+    # TRUE_FRONT_TRANSFORMED = np.array((1, 0))
+    TRUE_FRONT_TRANSFORMED = np.array((3.31095469, 0.02314122))
     
     return untransform_coords(TRUE_FRONT_TRANSFORMED, centre, front)
 
@@ -181,7 +195,7 @@ def _test_transform():
 def _test_image():
     # load image
     # image = cv2.imread('checkerboard2/3.jpg') # No dots - shouldn't find any
-    image = cv2.imread('dots/dot12.jpg') # Dots - should find them
+    image = cv2.imread('dots/dot17.jpg') # Dots - should find them
 
     # process image
     image = undistort(image)
@@ -280,13 +294,23 @@ class DotPatternVideo:
         self.video = VideoCapture(filename)
         self.balance = balance
     
-    def find(self):
+    def find(self, annotate = True, shift: np.ndarray = None, invmat: np.ndarray = None):
         """Find the dot pattern in the latest video frame, and draw it on if found.
+        If shift and invmat are specified, will also crop to the board.
+
+        Parameters
+        ----------
+        annotate : bool
+            Whether to add annotations, default True
+        shift : np.ndarray or None
+            Shift found with get_shift_invmat_mat(), default None
+        invmat : np.ndarray or None
+            Invmat found with get_shift_invmat_mat(), default None
 
         Returns
         -------
         frame : np.ndarray
-            The latest video frame with FPS and pattern annotations
+            The latest video frame after undistortion / cropping with FPS and pattern annotations
         found : bool
             Whether a valid pattern was found
         centre : np.ndarray or None
@@ -299,29 +323,32 @@ class DotPatternVideo:
         # Read a new frame
         frame = self.video.read()
         frame = undistort(frame, self.balance)
+        if shift is not None and invmat is not None:
+            frame = crop_board(frame, shift, invmat)
         found, bbox = getDotBbox(getDots(frame))
         centre = None
         front = None
         if found:
             centre, front = drawMarkers(frame, bbox, (255, 0, 0))
         else: # not found
-            cv2.putText(frame, "Dot pattern not detected", (100, 150),
+            annotate and cv2.putText(frame, "Dot pattern not detected", (100, 150),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0, 0, 255), 2)
             self.track_fail_count += 1
 
-        fps = cv2.getTickFrequency() / (cv2.getTickCount() - timer)
-            
-        # Display FPS on frame
-        cv2.putText(frame, "FPS : " + str(int(fps)), (100, 50),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.75, (50, 170, 50), 2)
-        # Display fails on frame
-        cv2.putText(frame, "fails : " + str(int(self.track_fail_count)), (100, 100),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.75, (50, 170, 50), 2)
+        if annotate:
+            fps = cv2.getTickFrequency() / (cv2.getTickCount() - timer)
+                
+            # Display FPS on frame
+            cv2.putText(frame, "FPS : " + str(int(fps)), (100, 50),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.75, (50, 170, 50), 2)
+            # Display fails on frame
+            cv2.putText(frame, "fails : " + str(int(self.track_fail_count)), (100, 100),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.75, (50, 170, 50), 2)
 
         return frame, found, centre, front
 
 
 if _DEBUG:
-    _test_transform()
+    # _test_transform()
     # _test_video()
-    # _test_image()
+    _test_image()
