@@ -711,6 +711,109 @@ def _test_calibrate():
      
     cv2.destroyAllWindows()
 
+def _test_waypoints():
+    from waypoints import generate_waypoints
+    video = DotPatternVideo('http://localhost:8081/stream/video.mjpeg')
+    cv2.namedWindow("Tracking", cv2.WINDOW_NORMAL)
+    old_centre = np.array([100,100])
+    old_front = np.array([200,200])
+    TOL_STATIONARY = 3
+
+    getString = ip + "/TRIGGER/0/0///"
+    lastString = getString
+    command = (0,0)
+    duration = 0
+    lastCommand = command
+    # Time at which we will send a new command to the robot
+    next_command_time = round(time.time() * 1000) + 3000
+    frame, found, centre, front = video.find()
+    
+    blues, reds, bridge, home = generate_waypoints()
+    
+    # Time at which the robot will think it's stuck if no movement detected
+    stuck_time = round(time.time() * 1000) + 4000
+    not_stuck_pos = old_centre # The last position at which stuck = False
+    stuck_counter = 0 # The number of times the robot has been stuck
+    stuck = False # Whether it is currently stuck
+
+    while True:
+        frame, found, centre, front = video.find()
+        frame = draw_waypoints(frame)
+        if found:
+            # Make sure commands aren't sent while the bot is moving
+            distance = np.linalg.norm(old_centre - centre)
+            distance = max(distance, np.linalg.norm(front - old_front))
+            old_centre = centre
+            old_front = front
+
+            # Make sure commands aren't sent too rapidly
+            current_time = round(time.time() * 1000)
+
+            # If the robot isn't supposed to move, then stuck = false
+            # If the robot has moved from its last non-stuck position
+                # stuck = false
+            # If it has been 5s since a non-zero command was sent,
+            # and the robot hasn't moved far away from its last non-stuck position
+                # stuck = true
+            if lastCommand[0] == 0 and lastCommand[1] == 0:
+                print("Not supposed to move")
+                stuck = False
+                not_stuck_pos = centre
+                stuck_time = current_time + STUCK_TIMEOUT
+            elif np.linalg.norm(centre - not_stuck_pos) > 10:
+                print("Stuckn't")
+                stuck = False
+                not_stuck_pos = centre
+                stuck_time = current_time + STUCK_TIMEOUT
+            elif current_time > stuck_time:
+                print("Stuck detected")
+                stuck = True
+            
+            if current_time > next_command_time:
+                # Reset command to None
+                command = None
+                if stuck:
+                    print("Getting stuck command")
+                    command, duration = STUCK_COMMANDS[stuck_counter]
+                    stuck_counter = (stuck_counter + 1) % len(STUCK_COMMANDS)
+                elif distance < TOL_STATIONARY:
+                    print("Getting normal command")
+                    command, duration = cross_bridge(centre, front, go_to_dropoff_side)
+                    if command is None:
+                        go_to_dropoff_side = not go_to_dropoff_side
+                        command, duration = cross_bridge(centre, front, go_to_dropoff_side)
+                if command is not None and duration > 0.005:
+                    # Turn that into a getString
+                    duration *= 1000 # Turn s into ms
+                    if math.isnan(duration): 
+                        # If nan, just give up, and pray the next frame is ok.
+                        # This should never happen!
+                        print("==============================")
+                        print("DURATION WAS NAN, MUST FIX NOW")
+                        print("==============================")
+                        print(f"command: {command}")
+                        time.sleep(5)
+                        continue
+                    duration = int(duration)
+                    getString = ip + "/TRIGGER/" + str(command[0]) + "/" + str(command[1]) + "//" + str(duration) + "/"
+
+                    SEND_COMMANDS and urllib.request.urlopen(getString)
+                    print("sending new command")
+                    print(getString)
+                    next_command_time = current_time + duration + MIN_COMMAND_INTERVAL
+                    lastCommand = command
+                    lastString = getString
+            cv2.circle(frame, np.int0(get_CofR(centre, front)), 5, (255,255,0),-1)
+        cv2.imshow("Tracking", frame)
+
+        key = cv2.waitKey(1) & 0xFF
+        # Exit if q pressed
+        if key == ord('q'):
+            break
+     
+    cv2.destroyAllWindows()
+
+
 if __name__ == "__main__":
     # _test_go_to_target()
     _test_go_loop()
