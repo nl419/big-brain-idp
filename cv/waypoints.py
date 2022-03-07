@@ -240,6 +240,8 @@ class Waypoint:
         cv2.line(image, start, end, colour, 2)
 
 
+# _T means transformed coordinates (relative to the yellow barriers)
+
 BLUE_CORNER_T = np.array((-1.88769, 0.01154))
 RED_CORNER_T = np.array((2.05079, -0.00796))
 PICKUP_CROSS_T = np.array((-0.04367, 1.02938))
@@ -256,9 +258,13 @@ RED_DROPOFFS_T = np.array((
     (0.59703, -0.75593)
 ))
 
-# Intermediate waypoints
+HOME_T = np.array((-0.02170, -1.78574))
+
+## Intermediate waypoints
+# Near corners on pickup / dropoff side
 BLUE_POINT_PICKUP_T = np.array((-1.43523, 0.49387))
 BLUE_POINT_DROPOFF_T = np.array((-1.44936, -0.44925))
+# Near dropoff boxes
 BLUE_POINT_BOX1_T = np.array((-0.82942, -0.98781))
 BLUE_POINT_BOX2_T = np.array((-0.84395, -0.51035))
 
@@ -267,10 +273,34 @@ RED_POINT_DROPOFF_T = np.array((1.46287, -0.51847))
 RED_POINT_BOX1_T = np.array((0.79716, -1.04265))
 RED_POINT_BOX2_T = np.array((0.80650, -0.55608))
 
-HOME_T = np.array((-0.02170, -1.78574))
 
 # =====================================================================
 # =====================================================================
+
+# Generate waypoints to go to a blue dropoff location
+def generate_blue_waypoints(image, shift, invmat, count):
+    return 1
+
+# Generate waypoints to go to a red dropoff location
+def generate_red_waypoints(image, shift, invmat, count):
+    # BROKEN DO NOT USE
+    from find_coords import dropoff_boxes
+    blues, reds = dropoff_boxes(image)
+    red = reds[count]
+
+    corner = untransform_board(shift, invmat, RED_CORNER_T)
+    corner_pickup = untransform_board(shift, invmat, RED_POINT_PICKUP_T)
+    corner_dropoff = untransform_board(shift, invmat, RED_POINT_DROPOFF_T)
+
+    pickup = untransform_board(shift, invmat, PICKUP_CROSS_T)
+
+    # Corner, dropoff, corner, pickup
+
+    return (
+        (
+            Waypoint(red)
+        )
+    )
 
 
 
@@ -478,6 +508,23 @@ def draw_points(image, shift, invmat):
     return image
 
 def _test_waypoint():
+    from unfisheye import undistort
+    from crop_board import remove_shadow, crop_board
+    from find_coords import get_shift_invmat_mat
+    image = cv2.imread("new_board/1.jpg")
+    # image = cv2.imread("dots/dot3.jpg")
+    # image = cv2.imread("checkerboard2/3.jpg")
+    image = undistort(image)
+    image2 = image.copy()
+    
+    # Preprocess
+    image2 = remove_shadow(image2)
+    shift, invmat, mat = get_shift_invmat_mat(image2)
+    image = crop_board(image, shift, invmat)
+    image = remove_shadow(image)
+
+    untransform_board(shift, invmat, RED_CORNER_T)
+
     wp = Waypoint(target_pos=np.array((100,100)), target_orient=None, 
                   pos_tol=1, orient_tol=1, robot_offset=np.array((1,0)),
                   move_backward_ok=False)
@@ -489,8 +536,8 @@ def _test_points():
     from unfisheye import undistort
     from crop_board import remove_shadow, crop_board
     from find_coords import get_shift_invmat_mat
-    # image = cv2.imread("new_board/1.jpg")
-    image = cv2.imread("dots/dot3.jpg")
+    image = cv2.imread("new_board/1.jpg")
+    # image = cv2.imread("dots/dot3.jpg")
     # image = cv2.imread("checkerboard2/3.jpg")
     image = undistort(image)
     image2 = image.copy()

@@ -161,7 +161,8 @@ def _test_find_block():
     # Find blocks in the pickup area of still images
 
     # image = cv2.imread("checkerboard2/3.jpg")
-    image = cv2.imread("block_ims/red-diag.jpg")
+    # image = cv2.imread("block_ims/2.jpg")
+    image = cv2.imread("new_board/1.jpg")
     image = undistort(image)
     im2 = remove_shadow(image.copy())
     shift, invmat, mat = get_shift_invmat_mat(im2)
@@ -170,7 +171,7 @@ def _test_find_block():
     cv2.imshow("before", image)
     cv2.waitKey(0)
     cv2.destroyAllWindows()
-    mid, forward, blue = find_block(image, shift, invmat, 45)
+    mid, forward, blue = find_block(image, shift, invmat, 0)
 
     if mid is None:
         cv2.imshow("no block!", image)
