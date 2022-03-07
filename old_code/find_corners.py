@@ -2,8 +2,11 @@
 Sensitive to noise, so """
 
 import cv2
-from laggy_video import VideoCapture
 import numpy as np
+import sys
+sys.path.insert(1, "cv") 
+# Ignore these import errors
+from laggy_video import VideoCapture
 from unfisheye import undistort
 
 cap = VideoCapture('http://localhost:8081/stream/video.mjpeg')

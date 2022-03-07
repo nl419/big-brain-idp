@@ -14,10 +14,11 @@ Rough explanation
 
 import cv2
 import sys
-from laggy_video import VideoCapture
+sys.path.insert(1, "cv") 
+# Ignore these import errors
 from find_qr import *
-from unfisheye import undistort
 
+video_file = 'test_vids/qr2.mp4'
 DIM = (np.array((1920, 1080))).astype(int)
 USE_CROP = True # Whether to crop image around an estimated QR code area
 TRACKER = False  # True = ROI tracker, False = QR tracker
@@ -42,11 +43,19 @@ if __name__ == '__main__':
         track_fail_count = track_timeout # Always reset on first frame
 
     # Read video
-    video = VideoCapture('http://localhost:8081/stream/video.mjpeg')
+    video = cv2.VideoCapture(video_file)
+
+    # Exit if video not opened.
+    if not video.isOpened():
+        print("Could not open video")
+        sys.exit()
 
     # Read first frame.
-    frame = video.read()
-    frame = undistort(frame,0.4)
+    ok, frame = video.read()
+    if not ok:
+        print('Cannot read video file')
+        sys.exit()
+
     qrDecoder = cv2.QRCodeDetector()
 
     if USE_CROP and TRACKER:
@@ -56,8 +65,10 @@ if __name__ == '__main__':
 
     while True:
         # Read a new frame
-        frame = video.read()
-        frame = undistort(frame,0.4)
+        ok, frame = video.read()
+        if not ok:
+            break
+
         # Start timer
         timer = cv2.getTickCount()
 

@@ -1,7 +1,10 @@
 import cv2
 import numpy as np
-from unfisheye import undistort
 import timeit
+import sys
+sys.path.insert(1, "cv") 
+# Ignore these import errors
+from unfisheye import undistort
 
 CHECKERBOARD = (2,2)
 RESOLUTION = np.array([1016, 760])
