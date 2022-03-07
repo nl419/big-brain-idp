@@ -133,6 +133,20 @@ def barrier_centres(image: np.ndarray):
     return centres + middle
 
 def dropoff_boxes(img: np.ndarray):
+    """Find the dropoff boxes more accurately
+
+    Parameters
+    ----------
+    img : np.ndarray
+        The undistorted image to search
+
+    Returns
+    -------
+    blues : list of np.ndarray
+        The coordinates of the blue dropoff boxes
+    reds : list of np.ndarray
+        The coordinates of the red dropoff boxes
+    """
     # Find the dropoff boxes
     
     # Threshold for white
