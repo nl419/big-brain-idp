@@ -44,17 +44,6 @@ BLUE_TRIGGER = "TRIGGER/BLUE" # What string the Arduino will return upon seeing 
 STATIONARY_THRESH = 2
 STUCK_TIME_THRESH = 5000 # ms, maybe there was a huge lag spike
 
-# def draw_waypoints(image: np.ndarray):
-#     for p in PICKUP_BBOX:
-#         cv2.circle(image, p, 3, (0,128,128), thickness=2)
-#     for p in RED_DROPOFFS:
-#         cv2.circle(image, p, 3, (0,0,128), thickness=2)
-#     for p in BLUE_DROPOFFS:
-#         cv2.circle(image, p, 3, (128,0,0), thickness=2)
-#     for p in BRIDGE_POINTS:
-#         cv2.circle(image, p, 3, (128,128,0), thickness=2)
-#     return image
-
 def centre_of_rotation (a0: np.ndarray, b0: np.ndarray, a1: np.ndarray, b1: np.ndarray):
     """Returns the centre of rotation for a pair of initial and final coords
     for two points
