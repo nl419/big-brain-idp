@@ -2,7 +2,6 @@
 Reads video stream from idpcam2, finds robot location & orientation,
 calculates motor commands to arrive at target location."""
 
-from pickle import TRUE
 import numpy as np
 import cv2
 # For the example cases at bottom
