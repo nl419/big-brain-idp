@@ -13,14 +13,14 @@ invert_hue = False
 do_crop_board = True
 do_crop_pickup = False
 do_blur = False
-do_remove_shadow = True
-do_kmeans = True
+do_remove_shadow = False
+do_kmeans = False
 do_erode = False
 
 # Load in image
 # image = cv2.imread('block_ims/2.jpg')
 # image = cv2.imread('dots/dot3.jpg')
-image = cv2.imread('dots/dot17.jpg')
+image = cv2.imread('dots/dot14.jpg')
 # image = cv2.imread('checkerboard2/3.jpg')
 
 # Preprocess
@@ -39,7 +39,7 @@ if do_crop_board or do_crop_pickup:
 if do_blur:
     image = cv2.blur(image, (5,5))
 if do_remove_shadow:
-    image = remove_shadow(image, 101)
+    image = remove_shadow(image, 201)
 temp = cv2.resize(image, (image.shape[1]//2, image.shape[0]//2))
 cv2.imshow("image", temp)
 cv2.waitKey(0)
@@ -53,7 +53,7 @@ if do_kmeans:
 SHOW_MASK = False # False => show entire image after threshold, True => just show mask
 
 # Set initial values
-hMin = 0; sMin = 0; vMin = 100; hMax = 179; sMax = 40; vMax = 255
+hMin = 140; sMin = 20; vMin = 170; hMax = 170; sMax = 255; vMax = 255
 
 # Create a window, scale it to fit screen
 # win = cv2.namedWindow('image', cv2.WINDOW_GUI_NORMAL + cv2.WINDOW_NORMAL)

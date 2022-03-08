@@ -2,6 +2,7 @@
 Reads video stream from idpcam2, finds robot location & orientation,
 calculates motor commands to arrive at target location."""
 
+from pickle import TRUE
 import numpy as np
 import cv2
 # For the example cases at bottom
@@ -15,22 +16,12 @@ from find_qr import *
 from find_dots import *
 import time
 import math
-
-FORWARD = np.array((-250,-255))
-BACKWARD = -FORWARD
-LEFT = np.array((100, -100))
-RIGHT = -LEFT
-
-GATE_UP = 135
-GATE_DOWN = 45
-
-MOVEMENT_SPEED = 44     # Forward/Backward movement speed in px/s on unscaled image
-ROTATION_SPEED = 2 * np.pi / 18      # Radians per second
-
-ip = "http://192.168.137.152"
+from robot_properties import *
+ip = "http://192.168.137.169"
 
 SEND_COMMANDS = False # whether to attempt to send commands to the ip address
 MIN_COMMAND_INTERVAL = 1000 # in ms
+DEBUG_WAYPOINTS = True
 
 # Commands to try if the robot gets stuck
 STUCK_COMMANDS = (
@@ -50,7 +41,6 @@ CALIBRATION_COMMANDS = (
     (FORWARD, 2)
 )
 
-PICKUP_OFFSET = np.array((1,0))
 BLUE_TRIGGER = "TRIGGER/BLUE" # What string the Arduino will return upon seeing a blue block
 STATIONARY_THRESH = 2
 STUCK_TIME_THRESH = 5000 # ms, maybe there was a huge lag spike
@@ -124,19 +114,15 @@ def centre_of_rotation (a0: np.ndarray, b0: np.ndarray, a1: np.ndarray, b1: np.n
     print(f"bhalf {bhalf}")
     print(f"aperp {aperp}")
     print(f"bperp {bperp}")
-    
-    test_0_0 = np.array((1,-1))
-    test_0_1 = np.array((1,1))
-    test_1_0 = np.array((-1,0.5))
-    test_1_1 = np.array((2,0.5))
-    test_result = seg_intersect(test_0_0, test_0_1, test_1_0, test_1_1)
-    print(f"test_result {test_result}")
 
     # handle edge cases of zero length
     if np.linalg.norm(da) < LENGTH_TOL:
         c = ahalf
     elif np.linalg.norm(db) < LENGTH_TOL:
         c = bhalf
+    # If the vectors are very nearly parallel
+    elif np.cross(perp(da), perp(db)) / np.linalg.norm(da) / np.linalg.norm(db) < 0.01:
+        c = seg_intersect(a0, b0, a1, b1)
     else: # all vectors are well behaved. find the centre.
         c = seg_intersect(ahalf, aperp, bhalf, bperp)
     
@@ -150,7 +136,7 @@ def centre_of_rotation (a0: np.ndarray, b0: np.ndarray, a1: np.ndarray, b1: np.n
     # Find forward direction from how the CofR moved
 def _test_calibrate():
     #video = QRVideo('http://localhost:8081/stream/video.mjpeg', 0, 2.5)
-    video = DotPatternVideo('http://localhost:8081/stream/video.mjpeg')
+    video = DotPatternVideo('http://localhost:8082/stream/video.mjpeg')
     cv2.namedWindow("Tracking", cv2.WINDOW_NORMAL)
     old_centre = np.array([100,100])
     old_front = np.array([200,200])
@@ -162,7 +148,7 @@ def _test_calibrate():
     getString = ip + "/"
     lastString = ip + "/TRIGGER/0/0///"
     current_time = round(time.time() * 1000)
-    next_command_time = round(time.time() * 1000) + 5000
+    next_command_time = round(time.time() * 1000) + 3000
     duration = 0
 
     calibration_mode = 0 # 0 = rotation, 1 = translation
@@ -217,11 +203,10 @@ def _test_calibrate():
                 duration = int(duration)
                 getString = ip + "/TRIGGER/" + str(command[0]) + "/" + str(command[1]) + "//" + str(duration) + "/"
 
-            SEND_COMMANDS and urllib.request.urlopen(getString)
-            print("sending new command")
-            print(getString)
-            lastString = getString
-            next_command_time = round(time.time() * 1000) + duration + MIN_COMMAND_INTERVAL * 4
+                SEND_COMMANDS and urllib.request.urlopen(getString)
+                print("sending new command")
+                print(getString)
+                next_command_time = round(time.time() * 1000) + duration + MIN_COMMAND_INTERVAL * 4
         cv2.circle(frame, np.int0(start_centre), 5, (0,255,0), -1)
         cv2.imshow("Tracking", frame)
 
@@ -235,6 +220,7 @@ def _test_calibrate():
 class Navigator:
     _video: DotPatternVideo
     _frame: np.ndarray
+    _found: bool = False
     _shift: np.ndarray
     _invmat: np.ndarray
     _mat: np.ndarray
@@ -269,7 +255,7 @@ class Navigator:
     _red_corner_wps: "tuple[tuple[Waypoint]]"
 
     # Generated automatically on state change
-    _current_wps: "list[Waypoint or tuple]"
+    _current_wps: "list[Waypoint or tuple]" = []
     _wp_counter: int = 0
 
     # When placing the last block, place it backwards to the usual orientation
@@ -277,7 +263,7 @@ class Navigator:
     _home_wp: "Waypoint"
 
     # The string that was returned by the Arduino
-    _ret_string: str
+    _ret_string: str = ""
     _command_timeout: int = 0
 
     def __init__(self, videostream_url: str):
@@ -285,41 +271,49 @@ class Navigator:
         frame, _,_,_ = self._video.find(annotate=False)
         self._shift, self._invmat, self._mat = get_shift_invmat_mat(frame)
         self._blues, self._reds = dropoff_boxes(frame, self._shift, self._invmat)
-        # TODO init waypoints
+
         self._home_wp = Waypoint(target_pos=untransform_board(self._shift, self._invmat, HOME_T), 
             target_orient=untransform_board(self._shift, self._invmat, np.array((0,0))) - untransform_board(self._shift, self._invmat, HOME_T)
         )
         self._blue_corner_wps = (
             (
                 Waypoint(
-                    target_pos=untransform_board(self._shift, self._invmat, BLUE_POINT_DROPOFF_T),
-                    target_orient=untransform_board(self._shift, self._invmat, BLUE_CORNER_T) - \
-                    untransform_board(self._shift, self._invmat, BLUE_POINT_DROPOFF_T),
-                    pos_tol=40
+                    target_pos=untransform_board(self._shift, self._invmat, BLUE_CORNER_TS[0]),
+                    target_orient=untransform_board(self._shift, self._invmat, BLUE_CORNER_TS[1]) - \
+                    untransform_board(self._shift, self._invmat, BLUE_CORNER_TS[0]),
+                    robot_offset=COFR_OFFSET, pos_tol=40
                 ),
                 Waypoint(
-                    target_pos=untransform_board(self._shift, self._invmat, BLUE_CORNER_T),
-                    pos_tol=5
+                    target_pos=untransform_board(self._shift, self._invmat, BLUE_CORNER_TS[1]),
+                    robot_offset=COFR_OFFSET, pos_tol=5
                 ),
                 Waypoint(
-                    target_pos=untransform_board(self._shift, self._invmat, BLUE_POINT_DROPOFF_T),
-                    pos_tol=40
+                    target_pos=untransform_board(self._shift, self._invmat, BLUE_CORNER_TS[2]),
+                    robot_offset=COFR_OFFSET, pos_tol=5
+                ),
+                Waypoint(
+                    target_pos=untransform_board(self._shift, self._invmat, BLUE_CORNER_TS[3]),
+                    robot_offset=COFR_OFFSET, pos_tol=40
                 )
             ),
             (
                 Waypoint(
-                    target_pos=untransform_board(self._shift, self._invmat, BLUE_POINT_PICKUP_T),
-                    target_orient=untransform_board(self._shift, self._invmat, BLUE_CORNER_T) - \
-                    untransform_board(self._shift, self._invmat, BLUE_POINT_PICKUP_T),
-                    pos_tol=40
+                    target_pos=untransform_board(self._shift, self._invmat, BLUE_CORNER_TS[3]),
+                    target_orient=untransform_board(self._shift, self._invmat, BLUE_CORNER_TS[2]) - \
+                    untransform_board(self._shift, self._invmat, BLUE_CORNER_TS[3]),
+                    robot_offset=COFR_OFFSET, pos_tol=40
                 ),
                 Waypoint(
-                    target_pos=untransform_board(self._shift, self._invmat, BLUE_CORNER_T),
-                    pos_tol=5
+                    target_pos=untransform_board(self._shift, self._invmat, BLUE_CORNER_TS[2]),
+                    robot_offset=COFR_OFFSET, pos_tol=5
                 ),
                 Waypoint(
-                    target_pos=untransform_board(self._shift, self._invmat, BLUE_POINT_PICKUP_T),
-                    pos_tol=40
+                    target_pos=untransform_board(self._shift, self._invmat, BLUE_CORNER_TS[1]),
+                    robot_offset=COFR_OFFSET, pos_tol=5
+                ),
+                Waypoint(
+                    target_pos=untransform_board(self._shift, self._invmat, BLUE_CORNER_TS[0]),
+                    robot_offset=COFR_OFFSET, pos_tol=40
                 )
             )
         )
@@ -327,34 +321,42 @@ class Navigator:
         self._red_corner_wps = (
             (
                 Waypoint(
-                    target_pos=untransform_board(self._shift, self._invmat, RED_POINT_DROPOFF_T),
-                    target_orient=untransform_board(self._shift, self._invmat, RED_CORNER_T) - \
-                    untransform_board(self._shift, self._invmat, RED_POINT_DROPOFF_T),
-                    pos_tol=40
+                    target_pos=untransform_board(self._shift, self._invmat, RED_CORNER_TS[0]),
+                    target_orient=untransform_board(self._shift, self._invmat, RED_CORNER_TS[1]) - \
+                    untransform_board(self._shift, self._invmat, RED_CORNER_TS[0]),
+                    robot_offset=COFR_OFFSET, pos_tol=40
                 ),
                 Waypoint(
-                    target_pos=untransform_board(self._shift, self._invmat, RED_CORNER_T),
-                    pos_tol=5
+                    target_pos=untransform_board(self._shift, self._invmat, RED_CORNER_TS[1]),
+                    robot_offset=COFR_OFFSET, pos_tol=5
                 ),
                 Waypoint(
-                    target_pos=untransform_board(self._shift, self._invmat, RED_POINT_DROPOFF_T),
-                    pos_tol=40
+                    target_pos=untransform_board(self._shift, self._invmat, RED_CORNER_TS[2]),
+                    robot_offset=COFR_OFFSET, pos_tol=5
+                ),
+                Waypoint(
+                    target_pos=untransform_board(self._shift, self._invmat, RED_CORNER_TS[3]),
+                    robot_offset=COFR_OFFSET, pos_tol=40
                 )
             ),
             (
                 Waypoint(
-                    target_pos=untransform_board(self._shift, self._invmat, RED_POINT_PICKUP_T),
-                    target_orient=untransform_board(self._shift, self._invmat, RED_CORNER_T) - \
-                    untransform_board(self._shift, self._invmat, RED_POINT_PICKUP_T),
-                    pos_tol=40
+                    target_pos=untransform_board(self._shift, self._invmat, RED_CORNER_TS[3]),
+                    target_orient=untransform_board(self._shift, self._invmat, RED_CORNER_TS[2]) - \
+                    untransform_board(self._shift, self._invmat, RED_CORNER_TS[3]),
+                    robot_offset=COFR_OFFSET, pos_tol=40
                 ),
                 Waypoint(
-                    target_pos=untransform_board(self._shift, self._invmat, RED_CORNER_T),
-                    pos_tol=5
+                    target_pos=untransform_board(self._shift, self._invmat, RED_CORNER_TS[2]),
+                    robot_offset=COFR_OFFSET, pos_tol=5
                 ),
                 Waypoint(
-                    target_pos=untransform_board(self._shift, self._invmat, RED_POINT_PICKUP_T),
-                    pos_tol=40
+                    target_pos=untransform_board(self._shift, self._invmat, RED_CORNER_TS[1]),
+                    robot_offset=COFR_OFFSET, pos_tol=5
+                ),
+                Waypoint(
+                    target_pos=untransform_board(self._shift, self._invmat, RED_CORNER_TS[0]),
+                    robot_offset=COFR_OFFSET, pos_tol=40
                 )
             )
         )
@@ -364,17 +366,17 @@ class Navigator:
             (
                 (0,0),
                 GATE_UP,
-                1000
+                1 # In seconds
             ),
             (
                 BACKWARD,
                 GATE_UP,
-                1000
+                1
             ),
             (
                 (0,0),
                 GATE_DOWN,
-                500
+                0.5
             )
         ]
 
@@ -383,33 +385,33 @@ class Navigator:
                 Waypoint(
                     target_pos=untransform_board(self._shift, self._invmat, BLUE_POINT_BOX1_T),
                     target_orient=self._blues[0] - untransform_board(self._shift, self._invmat, BLUE_POINT_BOX1_T),
-                    pos_tol=10, orient_tol=3
+                    pos_tol=10, orient_tol=3, robot_offset=GATE_OFFSET
                 ),
                 Waypoint(
                     target_pos=self._blues[0],
-                    pos_tol=3, orient_tol=3
+                    pos_tol=3, orient_tol=3, robot_offset=GATE_OFFSET
                 )
             ],
             [
                 Waypoint(
                     target_pos=untransform_board(self._shift, self._invmat, BLUE_POINT_BOX2_T),
                     target_orient=self._blues[1] - untransform_board(self._shift, self._invmat, BLUE_POINT_BOX2_T),
-                    pos_tol=10, orient_tol=3
+                    pos_tol=10, orient_tol=3, robot_offset=GATE_OFFSET
                 ),
                 Waypoint(
                     target_pos=self._blues[1],
-                    pos_tol=3, orient_tol=3
+                    pos_tol=3, orient_tol=3, robot_offset=GATE_OFFSET
                 )
             ],
             [
                 Waypoint(
                     target_pos=self._blues[1] + np.array((100,0)),
-                    target_orient=np.array((100,0)),
-                    pos_tol=10, orient_tol=3
+                    target_orient=np.array((-100,0)),
+                    pos_tol=10, orient_tol=3, robot_offset=GATE_OFFSET
                 ),
                 Waypoint(
                     target_pos=self._blues[1],
-                    pos_tol=3, orient_tol=3
+                    pos_tol=3, orient_tol=3, robot_offset=GATE_OFFSET
                 )
             ]
         ]
@@ -419,33 +421,33 @@ class Navigator:
                 Waypoint(
                     target_pos=untransform_board(self._shift, self._invmat, RED_POINT_BOX1_T),
                     target_orient=self._reds[0] - untransform_board(self._shift, self._invmat, RED_POINT_BOX1_T),
-                    pos_tol=10, orient_tol=3
+                    pos_tol=10, orient_tol=3, robot_offset=GATE_OFFSET
                 ),
                 Waypoint(
                     target_pos=self._reds[0],
-                    pos_tol=3, orient_tol=3
+                    pos_tol=3, orient_tol=3, robot_offset=GATE_OFFSET
                 )
             ],
             [
                 Waypoint(
                     target_pos=untransform_board(self._shift, self._invmat, RED_POINT_BOX2_T),
                     target_orient=self._reds[1] - untransform_board(self._shift, self._invmat, RED_POINT_BOX2_T),
-                    pos_tol=10, orient_tol=3
+                    pos_tol=10, orient_tol=3, robot_offset=GATE_OFFSET
                 ),
                 Waypoint(
                     target_pos=self._reds[1],
-                    pos_tol=3, orient_tol=3
+                    pos_tol=3, orient_tol=3, robot_offset=GATE_OFFSET
                 )
             ],
             [
                 Waypoint(
                     target_pos=self._reds[1] + np.array((0,-100)),
-                    target_orient=np.array((0,-100)),
-                    pos_tol=10, orient_tol=3
+                    target_orient=np.array((0,100)),
+                    pos_tol=10, orient_tol=3, robot_offset=GATE_OFFSET
                 ),
                 Waypoint(
                     target_pos=self._reds[1],
-                    pos_tol=3, orient_tol=3
+                    pos_tol=3, orient_tol=3, robot_offset=GATE_OFFSET
                 )
             ]
         ]
@@ -498,6 +500,7 @@ class Navigator:
 
         while True:
             # Handle being stuck
+            gate_pos = None
             if self._stuck_since is not None and self._stuck_since > now + STUCK_TIME_THRESH:
                 print("Stuck detected. Executing stuck command")
                 command, duration = STUCK_COMMANDS[self._stuck_counter]
@@ -522,9 +525,9 @@ class Navigator:
                     self._block_blue = True
                 else:
                     print("Red.")
-                    self._block_blue = False
+                    if not DEBUG_WAYPOINTS: self._block_blue = False
                 # Don't send commands too quickly
-                time.sleep(MIN_COMMAND_INTERVAL)
+                time.sleep(MIN_COMMAND_INTERVAL / 1000)
                 # Stand still for 2 seconds.
                 command, duration = (0,0), 2
                 self._wp_counter += 1
@@ -552,7 +555,7 @@ class Navigator:
             return True
         duration = int(duration)
         get_string = ip + "/TRIGGER/" + str(command[0]) + "/" + str(command[1]) + \
-                    "/" + str(gate_pos) if gate_pos is not None else "" + "/" + str(duration) + "/"
+                    "/" + (str(gate_pos) if gate_pos is not None else "") + "/" + str(duration) + "/"
 
         if SEND_COMMANDS: self._ret_string = urllib.request.urlopen(get_string)
         print(f"sending command {get_string}")
@@ -563,26 +566,29 @@ class Navigator:
         # Gets the next frame, and updates the waypoints if necessary
         # Returns False if the state was not properly updated
         if not reuse_frame: 
-            self._frame, found, new_c, new_f = self._video.find(shift=self._shift, invmat=self._invmat)
-            if not found:
-                return False
+            self._frame, self._found, new_c, new_f = self._video.find(shift=self._shift, invmat=self._invmat)
+            if not self._found:
+                if DEBUG_WAYPOINTS:
+                    new_c = np.array((800,200))
+                    new_f = np.array((700,300))
+                else: return False
             self._delta = max(np.linalg.norm(new_c - self._centre), np.linalg.norm(new_f - self._front))
             self._centre = new_c
             self._front = new_f
-        if not found:
+        if not self._found and not DEBUG_WAYPOINTS:
             return False
 
         if not self._wps_up_to_date:
             self._current_wps = []
             if self._got_block:
                 # Go to dropoff
-                self._current_wps.append(self._blue_corner_wps[1] if self._block_blue else self._red_corner_wps[1])
+                self._current_wps.extend(self._blue_corner_wps[1] if self._block_blue else self._red_corner_wps[1])
                 i = self._blue_count if self._block_blue else self._red_count
                 assert i < 2, "Too many " + "blue" if self._block_blue else "red" + " blocks have been found"
                 # Put the very last block in backwards, so that home can still be driven to easily
                 if (self._red_count == 2 or self._blue_count == 2) and i == 1:
                     i = 2
-                self._current_wps.append(self._blue_dropoff_wps[i] if self._block_blue else self._red_dropoff_wps[i])
+                self._current_wps.extend(self._blue_dropoff_wps[i] if self._block_blue else self._red_dropoff_wps[i])
                 if self._block_blue:
                     self._blue_count += 1
                 else:
@@ -595,7 +601,8 @@ class Navigator:
                 # Make a route to pickup a block
                 b_c, _ = find_block(self._frame, self._shift, self._invmat)
                 if b_c is None:
-                    return False
+                    if DEBUG_WAYPOINTS: b_c = np.array((200,600))
+                    else: return False
                 # Make a waypoint at the block
                 b_c_T = transform_board(self._shift, self._mat, b_c)
                 block_wp = Waypoint(
@@ -619,28 +626,32 @@ class Navigator:
                         robot_offset=PICKUP_OFFSET
                     )
                     self._current_wps.append(route_wp)
+                    
+                self._current_wps.append((
+                    (0,0),
+                    GATE_UP,
+                    1
+                ))
                 self._current_wps.append(block_wp)
                 
                 # Check the colour
                 self._current_wps.append(
                     None
                 )
-                # TODO actually grab the colour
-
                 # Put the gate down
                 self._current_wps.append((
                     (0,0),
                     GATE_DOWN,
-                    1000
+                    1
                 ))
 
                 # Reverse a bit
                 self._current_wps.append((
                     BACKWARD,
                     GATE_DOWN,
-                    500
+                    0.5
                 ))
-            return True
+        return True
 
     def run(self) -> "tuple[np.ndarray, bool]":
         """Run the navigation code:
@@ -670,26 +681,43 @@ class Navigator:
         # Get the next frame, process it, send commands to robot.
         
         ok = self._update_state() # Grab next frame, update state
+        if len(self._current_wps) > 0 and self._wp_counter < len(self._current_wps):
+            self._draw_wp(self._current_wps[self._wp_counter])
         if not ok: return self._frame, False
+        self._wps_up_to_date = True # If we got here, the waypoints must be ok.
 
         if not self._run_wps():
             # reached end of wps
             self._got_block = not self._got_block
+            self._wps_up_to_date = False
             self._wps_up_to_date = self._update_state(reuse_frame=True) # Get next waypoints
             # If waypoints couldn't be calculated, wait until next frame
             if not self._wps_up_to_date: return self._frame, False 
             # New waypoints found, so execute the next one.
             self._run_wps()
-        self._draw_wp(self._current_wps[self._wp_counter])
         return self._frame, True
 
-if __name__ == "__main__":
-    # _test_calibrate()
-    Waypoint(np.array((0,0)))
-    nav = Navigator('http://localhost:8081/stream/video.mjpeg')
+def _test_navigator():
+    nav = Navigator('http://localhost:8082/stream/video.mjpeg')
+    write_count = 0
     while True:
         frame, ok = nav.run()
         cv2.imshow("nav", frame)
-        if cv2.waitKey(1) & 0xFF == ord('q'):
+        key = cv2.waitKey(1) & 0xFF
+        if key == ord('q'):
             break
+        elif key == ord('n'):
+            nav._wp_counter += 1
+        elif key == ord('b'):
+            nav._block_blue = True
+        elif key == ord('r'):
+            nav._block_blue = False
+        elif key == ord('w'):
+            cv2.imwrite("nav-test-fails/" + write_count + ".jpg", frame)
+            write_count += 1
     cv2.destroyAllWindows()
+
+
+if __name__ == "__main__":
+    # _test_calibrate()
+    _test_navigator()

@@ -5,10 +5,10 @@ from find_coords import untransform_board
 _DEBUG = __name__ == "__main__"
 
 BOARD_CORNERS_T = np.array((
-    (-0.04257, -2.39275),
-    (-2.36891, -0.01291),
-    (-0.06849, 2.59533),
-    (2.55669, -0.03823)
+    (-0.04257, -2.49275),
+    (-2.46891, -0.01291),
+    (-0.06849, 2.69533),
+    (2.65669, -0.03823)
 ))
 
 PICKUP_CORNERS_T = np.array((
@@ -157,7 +157,7 @@ def _test_crop():
     """Test cropping into the board and into the pickup area"""
     from find_coords import get_shift_invmat_mat
     from unfisheye import undistort
-    image = cv2.imread("dots/dot7.jpg")
+    image = cv2.imread("dots/dot17.jpg")
     image = undistort(image)
     image = remove_shadow(image)
     shift, invmat, _ = get_shift_invmat_mat(image)

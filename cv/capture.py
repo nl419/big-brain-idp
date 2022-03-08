@@ -5,7 +5,7 @@ import cv2
 folder = "dots"
 
 print ("starting grab")
-cap = cv2.VideoCapture('http://localhost:8081/stream/video.mjpeg')
+cap = cv2.VideoCapture('http://localhost:8082/stream/video.mjpeg')
 prefix = "dot"
 counter = 17
 while True:

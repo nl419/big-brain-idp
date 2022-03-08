@@ -87,7 +87,7 @@ def drawMarkers(img: np.ndarray, points: "list[int]", lineColour: "list[int]"):
     front : np.ndarray
         Front of bounding box, to sub-pixel accuracy
     """
-    x = points.astype(int)
+    x = np.array(points, dtype=np.int0)
     n = len(x)
     for j in range(n):
         p1 = tuple(x[j])

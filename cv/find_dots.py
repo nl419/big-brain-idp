@@ -4,6 +4,7 @@ from find_qr import drawMarkers
 from unfisheye import undistort
 from laggy_video import VideoCapture
 from crop_board import crop_board
+from robot_properties import *
 
 # Flag to print debug information
 _DEBUG = __name__ == "__main__"
@@ -78,7 +79,7 @@ def getDots(image: np.ndarray):
     """
     # Threshold hsv
     # hMin = 140; sMin = 90; vMin = 101; hMax = 166; sMax = 255; vMax = 255
-    hMin = 140; sMin = 42; vMin = 101; hMax = 170; sMax = 255; vMax = 255
+    hMin = 140; sMin = 20; vMin = 160; hMax = 170; sMax = 255; vMax = 255
     lower = np.array([hMin, sMin, vMin])
     upper = np.array([hMax, sMax, vMax])
     # Create HSV Image and threshold into a range.
@@ -173,15 +174,10 @@ def untransform_coords(x: np.ndarray, centre: np.ndarray, front: np.ndarray):
     return np.matmul(mat, x) + centre
 
 def get_CofR(centre: np.ndarray, front: np.ndarray):
-    # COFR_TRANSFORMED = np.array((0, -1))
-    COFR_TRANSFORMED = np.array((-0.74257382, -0.13944251))
-    return untransform_coords(COFR_TRANSFORMED, centre, front)
+    return untransform_coords(COFR_OFFSET, centre, front)
 
 def get_true_front(centre: np.ndarray, front:np.ndarray):
-    # TRUE_FRONT_TRANSFORMED = np.array((1, 0))
-    TRUE_FRONT_TRANSFORMED = np.array((3.31095469, 0.02314122))
-    
-    return untransform_coords(TRUE_FRONT_TRANSFORMED, centre, front)
+    return untransform_coords(TRUE_FRONT_OFFSET, centre, front)
 
 def _test_transform():
     x = np.array([1,0])
@@ -262,15 +258,30 @@ def angle(vec1: np.ndarray, vec2: np.ndarray):
         (i.e. +ve => vec2 is ccw from vec1)
     """
     # Angle between two vectors (in left handed coordinates)
-    # +ve = vec2 is ccw from vec1, -ve = vec2 is cw from vec1
+    # +ve = vec2 is cw from vec1, -ve = vec2 is ccw from vec1
     mag_vec1 = np.linalg.norm(vec1)
     mag_vec2 = np.linalg.norm(vec2)
     dot = np.dot(vec1, vec2) / mag_vec1 / mag_vec2
     cross = np.cross(vec1, vec2)
     angle = np.arccos(np.clip(dot, -1, 1))
-    if cross > 0:
+    if cross < 0:
         angle = -angle
     return angle
+
+def undo_parallax(coord: np.ndarray):
+    # 10 cm dot pattern height, 1.5 m camera height
+    # Similar triangles: 
+    # smaller triangle = 1.5 m * 'a' m, bigger triangle = (1.5 + 0.1) m * 'a' * (1.6/1.5) m
+    # Simply scale about the centre of the image.
+    CAMERA_HEIGHT = 1.5
+    DOT_PATTERN_HEIGHT = 0.1
+    parallax_scale = (DOT_PATTERN_HEIGHT + CAMERA_HEIGHT) / CAMERA_HEIGHT
+    parallax_shift = np.array((1016,760)) / 2
+    shifted = coord - parallax_shift
+    scaled = shifted * parallax_scale
+    undone = scaled + parallax_shift
+    return undone
+
 
 class DotPatternVideo:
     filename: str
@@ -296,6 +307,7 @@ class DotPatternVideo:
     
     def find(self, annotate = True, shift: np.ndarray = None, invmat: np.ndarray = None):
         """Find the dot pattern in the latest video frame, and draw it on if found.
+        Will also subtract any parallax from the coordinates.
         If shift and invmat are specified, will also crop to the board.
 
         Parameters
@@ -330,6 +342,7 @@ class DotPatternVideo:
         front = None
         if found:
             centre, front = drawMarkers(frame, bbox, (255, 0, 0))
+            centre, front = undo_parallax(centre), undo_parallax(front)
         else: # not found
             annotate and cv2.putText(frame, "Dot pattern not detected", (100, 150),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0, 0, 255), 2)
