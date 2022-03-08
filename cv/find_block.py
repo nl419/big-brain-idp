@@ -32,12 +32,21 @@ def find_block(image: np.ndarray, shift: np.ndarray, invmat: np.ndarray, angle_o
     # Mask the pickup area
     cropped = crop_board(image.copy(), shift, invmat, get_pickup_corners(shift, invmat))
     
+    if _DEBUG:
+        cv2.imshow("mask", mask_coloured)
+        cv2.waitKey(0)
+        cv2.destroyWindow("mask")
     # Mask the coloured areas
     hMin = 0; sMin = 100; vMin = 80; hMax = 179; sMax = 255; vMax = 255
     hsv = cv2.cvtColor(cropped, cv2.COLOR_BGR2HSV)
     lower = np.array([hMin, sMin, vMin])
     upper = np.array([hMax, sMax, vMax])
     mask_coloured = cv2.inRange(hsv, lower, upper)
+
+    if _DEBUG:
+        cv2.imshow("mask", mask_coloured)
+        cv2.waitKey(0)
+        cv2.destroyWindow("mask")
 
     # Get contours, remove ones with small area
     cnts, _ = cv2.findContours(mask_coloured, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
@@ -126,7 +135,7 @@ def _test_find_block():
 
     # image = cv2.imread("checkerboard2/3.jpg")
     # image = cv2.imread("block_ims/2.jpg")
-    image = cv2.imread("new_board/1.jpg")
+    image = cv2.imread("dots/dot17.jpg")
     image = undistort(image)
     im2 = remove_shadow(image.copy())
     shift, invmat, mat = get_shift_invmat_mat(im2)

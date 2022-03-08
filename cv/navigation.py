@@ -29,7 +29,7 @@ ROTATION_SPEED = 2 * np.pi / 18      # Radians per second
 
 ip = "http://192.168.137.152"
 
-SEND_COMMANDS = True # whether to attempt to send commands to the ip address
+SEND_COMMANDS = False # whether to attempt to send commands to the ip address
 MIN_COMMAND_INTERVAL = 1000 # in ms
 
 # Commands to try if the robot gets stuck
@@ -274,11 +274,11 @@ class Navigator:
 
     # When placing the last block, place it backwards to the usual orientation
     # so that then you can just go straight home, without knocking the blocks
-    _home_wp: Waypoint
+    _home_wp: "Waypoint"
 
     # The string that was returned by the Arduino
     _ret_string: str
-    _command_timeout: int
+    _command_timeout: int = 0
 
     def __init__(self, videostream_url: str):
         self._video = DotPatternVideo(videostream_url)
@@ -498,7 +498,7 @@ class Navigator:
 
         while True:
             # Handle being stuck
-            if self._stuck_since > now + STUCK_TIME_THRESH:
+            if self._stuck_since is not None and self._stuck_since > now + STUCK_TIME_THRESH:
                 print("Stuck detected. Executing stuck command")
                 command, duration = STUCK_COMMANDS[self._stuck_counter]
                 self._stuck_counter = (self._stuck_counter + 1) % len(STUCK_COMMANDS)
@@ -508,6 +508,7 @@ class Navigator:
                 self._wp_counter = 0
                 return False
             wp = self._current_wps[self._wp_counter]
+            print(type(wp))
             if type(wp) is Waypoint:
                 print("Executing waypoint")
                 command, duration = wp.get_command(self._centre, self._front)
@@ -563,6 +564,8 @@ class Navigator:
         # Returns False if the state was not properly updated
         if not reuse_frame: 
             self._frame, found, new_c, new_f = self._video.find(shift=self._shift, invmat=self._invmat)
+            if not found:
+                return False
             self._delta = max(np.linalg.norm(new_c - self._centre), np.linalg.norm(new_f - self._front))
             self._centre = new_c
             self._front = new_f
@@ -594,16 +597,17 @@ class Navigator:
                 if b_c is None:
                     return False
                 # Make a waypoint at the block
-                b_c_T = transform_board(self._shift, self._invmat, b_c)
+                b_c_T = transform_board(self._shift, self._mat, b_c)
                 block_wp = Waypoint(
                     target_pos=b_c, pos_tol=5, robot_offset=PICKUP_OFFSET,
                     orient_backward_ok=False, move_backward_ok=True
                 )
-                self._current_wps.append(self._blue_corner_wps[0] if self._block_blue else self._red_corner_wps[0])
+                corner_wps =  self._blue_corner_wps[0] if self._block_blue else self._red_corner_wps[0]
+                self._current_wps.extend(corner_wps)
 
                 # Avoid hitting the walls if the block is near the corner
                 route_wp = None
-                if b_c_T[1] > PICKUP_CENTRE_T:
+                if b_c_T[1] > PICKUP_CENTRE_T[1]:
                     if b_c_T[0] > 0:
                         # Block is in the bottom right half of the pickup area
                         # So approach from the top
@@ -624,18 +628,18 @@ class Navigator:
                 # TODO actually grab the colour
 
                 # Put the gate down
-                self._current_wps.append(
+                self._current_wps.append((
                     (0,0),
                     GATE_DOWN,
                     1000
-                )
+                ))
 
                 # Reverse a bit
-                self._current_wps.append(
+                self._current_wps.append((
                     BACKWARD,
                     GATE_DOWN,
                     500
-                )
+                ))
             return True
 
     def run(self) -> "tuple[np.ndarray, bool]":
@@ -666,7 +670,7 @@ class Navigator:
         # Get the next frame, process it, send commands to robot.
         
         ok = self._update_state() # Grab next frame, update state
-        if not ok: return False
+        if not ok: return self._frame, False
 
         if not self._run_wps():
             # reached end of wps
@@ -680,4 +684,12 @@ class Navigator:
         return self._frame, True
 
 if __name__ == "__main__":
-    _test_calibrate()
+    # _test_calibrate()
+    Waypoint(np.array((0,0)))
+    nav = Navigator('http://localhost:8081/stream/video.mjpeg')
+    while True:
+        frame, ok = nav.run()
+        cv2.imshow("nav", frame)
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+    cv2.destroyAllWindows()
