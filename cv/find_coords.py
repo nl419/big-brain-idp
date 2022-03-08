@@ -132,13 +132,18 @@ def barrier_centres(image: np.ndarray):
 
     return centres + middle
 
-def dropoff_boxes(img: np.ndarray):
-    """Find the dropoff boxes more accurately
+def dropoff_boxes(img: np.ndarray, shift=None, invmat=None):
+    """Find the dropoff boxes more accurately. Supply shift and invmat to
+    make the processing faster.
 
     Parameters
     ----------
     img : np.ndarray
         The undistorted image to search
+    shift : np.ndarray
+        The shift vector found with get_shift_invmat_mat(), default None
+    invmat : np.ndarray
+        The inverse matrix found with get_shift_invmat_mat(), default None
 
     Returns
     -------
@@ -158,9 +163,10 @@ def dropoff_boxes(img: np.ndarray):
     from crop_board import crop_board, remove_shadow, kmeans
     from find_coords import get_shift_invmat_mat
     image = img.copy()
-    image2 = image.copy()
-    image2 = remove_shadow(image2)
-    shift, invmat, _ = get_shift_invmat_mat(image2)
+    if shift is None or invmat is None:
+        image2 = image.copy()
+        image2 = remove_shadow(image2)
+        shift, invmat, _ = get_shift_invmat_mat(image2)
     image = crop_board(image, shift, invmat)
     image = remove_shadow(image, 101)
     image = kmeans(image, 4)
