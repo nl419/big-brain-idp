@@ -18,6 +18,8 @@ PICKUP_CORNERS_T = np.array((
     (0.20810, 2.20481)
 ))
 
+PICKUP_CENTRE_T = np.mean(PICKUP_CORNERS_T, axis=0)
+
 def get_board_corners(shift, invmat):
     return np.array((
         untransform_board(shift, invmat, BOARD_CORNERS_T[0]),
