@@ -268,14 +268,16 @@ def angle(vec1: np.ndarray, vec2: np.ndarray):
         angle = -angle
     return angle
 
-def undo_parallax(coord: np.ndarray):
-    # 10 cm dot pattern height, 1.5 m camera height
+def undo_parallax(coord: np.ndarray, height=0.1):
+    # The dot pattern on the robot will appear to be further away
+    # from the centre than it really is, due to parallax.
+
     # Similar triangles: 
+    # 10 cm dot pattern height, 1.5 m camera height
     # smaller triangle = 1.5 m * 'a' m, bigger triangle = (1.5 + 0.1) m * 'a' * (1.6/1.5) m
-    # Simply scale about the centre of the image.
+    # Simply scale about the centre of the image to undo parallax
     CAMERA_HEIGHT = 1.5
-    DOT_PATTERN_HEIGHT = 0.1
-    parallax_scale = (DOT_PATTERN_HEIGHT + CAMERA_HEIGHT) / CAMERA_HEIGHT
+    parallax_scale = CAMERA_HEIGHT / (height + CAMERA_HEIGHT)
     parallax_shift = np.array((1016,760)) / 2
     shifted = coord - parallax_shift
     scaled = shifted * parallax_scale

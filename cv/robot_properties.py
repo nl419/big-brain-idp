@@ -9,6 +9,9 @@ GATE_UP = 105
 GATE_DOWN = 45
 GATE_OFFSET = np.array((0.8,0))
 
+SENSOR_OFFSET_DETECT = np.array((1,0.2))
+SENSOR_OFFSET_NO_DETECT = np.array((1.5,0.2))
+
 MOVEMENT_SPEED = 44     # Forward/Backward movement speed in px/s on unscaled image
 ROTATION_SPEED = 2 * np.pi / 18      # Radians per second
 

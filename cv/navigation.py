@@ -2,6 +2,7 @@
 Reads video stream from idpcam2, finds robot location & orientation,
 calculates motor commands to arrive at target location."""
 
+from cv2 import createBackgroundSubtractorKNN
 import numpy as np
 import cv2
 # For the example cases at bottom
@@ -22,6 +23,8 @@ SEND_COMMANDS = False # whether to attempt to send commands to the ip address
 MIN_COMMAND_INTERVAL = 1000 # in ms
 DEBUG_WAYPOINTS = True
 
+BLOCK_HEIGHT = 0.03 # in m, for unparallaxing
+
 # Commands to try if the robot gets stuck
 STUCK_COMMANDS = (
     (FORWARD, 0.5),
@@ -40,7 +43,10 @@ CALIBRATION_COMMANDS = (
     (FORWARD, 2)
 )
 
-BLUE_TRIGGER = "TRIGGER/BLUE" # What string the Arduino will return upon seeing a blue block
+# How to parse the return from the Arduino
+SENSOR_DATA_TRIGGER = "TRIGGER/"
+END_SENSOR_DATA_TRIGGER = "/"
+SENSOR_DELTA_THRESH = 102 # 1024 is 5v
 STATIONARY_THRESH = 2
 STUCK_TIME_THRESH = 5000 # ms, maybe there was a huge lag spike
 
@@ -215,6 +221,7 @@ class Navigator:
 
     _got_block: bool = False
     _block_blue: bool = False
+    _last_reading: int = 0
     _wps_up_to_date: bool = False
 
     # Robot locations
@@ -499,7 +506,6 @@ class Navigator:
                 self._wp_counter = 0
                 return False
             wp = self._current_wps[self._wp_counter]
-            print(type(wp))
             if type(wp) is Waypoint:
                 print("Executing waypoint")
                 command, duration = wp.get_command(self._centre, self._front)
@@ -507,17 +513,27 @@ class Navigator:
                 # Check the colour of the block by sending a blank command
                 get_string = ip
                 if SEND_COMMANDS: self._ret_string = urllib.request.urlopen(get_string)
-                print("Checking block colour...", end=" ")
-                if BLUE_TRIGGER in self._ret_string:
-                    print("Blue.")
-                    self._block_blue = True
+                print("Reading sensor data.")
+                i = self._ret_string.find(SENSOR_DATA_TRIGGER)
+                assert i != -1, "Sensor data was not found."
+                i += len(SENSOR_DATA_TRIGGER)
+                j = self._ret_string[i:].find(END_SENSOR_DATA_TRIGGER)
+                assert j != -1, "End of sensor data was not found."
+                data = int(self._ret_string[i:i+j])
+                if self._last_reading == 0:
+                    self._last_reading = data
+                elif data - self._last_reading > SENSOR_DELTA_THRESH:
+                    print("Red block found.")
+                    self._block_blue = False
+                    self._last_reading = 0
                 else:
-                    print("Red.")
-                    if not DEBUG_WAYPOINTS: self._block_blue = False
+                    print("Blue block found.")
+                    if not DEBUG_WAYPOINTS: self._block_blue = True
+                    self._last_reading = 0
                 # Don't send commands too quickly
                 time.sleep(MIN_COMMAND_INTERVAL / 1000)
-                # Stand still for 2 seconds.
-                command, duration = (0,0), 2
+                # Stand still for 1 second.
+                command, duration = (0,0), 1
                 self._wp_counter += 1
             else:
                 print("Executing hardcoded command")
@@ -548,6 +564,14 @@ class Navigator:
         if SEND_COMMANDS: self._ret_string = urllib.request.urlopen(get_string)
         print(f"sending command {get_string}")
         self._command_timeout = now + duration + MIN_COMMAND_INTERVAL
+        
+        # Update not stuck threshold based on how much the robot should be moving
+        if abs(command[0]) > 150:
+            self._not_stuck_thresh = 5
+        elif command[0] != 0:
+            self._not_stuck_thresh = 2
+        else:
+            self._not_stuck_thresh = -1 
         return True
 
     def _update_state(self, reuse_frame: bool = False):
@@ -582,6 +606,16 @@ class Navigator:
                 else:
                     self._red_count += 1
             else:
+                # Summary:
+                # Find a block
+                # Approach the pickup area
+                # Move to take baseline colour reading
+                # Move to take block colour reading
+                # Open gate
+                # Move over block
+                # Close gate
+                # Reverse a little
+
                 # If all the blocks have been delivered, go home.
                 if self._blue_count == 2 and self._red_count == 2:
                     self._current_wps = [self._home_wp]
@@ -589,8 +623,9 @@ class Navigator:
                 # Make a route to pickup a block
                 b_c, _ = find_block(self._frame, self._shift, self._invmat)
                 if b_c is None:
-                    if DEBUG_WAYPOINTS: b_c = np.array((200,600))
+                    if DEBUG_WAYPOINTS: b_c = np.array((300,600))
                     else: return False
+                b_c = undo_parallax(b_c, BLOCK_HEIGHT)
                 # Make a waypoint at the block
                 b_c_T = transform_board(self._shift, self._mat, b_c)
                 block_wp = Waypoint(
@@ -614,26 +649,35 @@ class Navigator:
                         robot_offset=PICKUP_OFFSET
                     )
                     self._current_wps.append(route_wp)
-                    
+
+                # Read background lighting conds
+                self._current_wps.append(Waypoint(
+                    target_pos=b_c, pos_tol=5, robot_offset=SENSOR_OFFSET_NO_DETECT,
+                    orient_backward_ok=False, move_backward_ok=True
+                ))
+                self._current_wps.append(
+                    None
+                )
+                # Read block lighting conds
+                self._current_wps.append(Waypoint(
+                    target_pos=b_c, pos_tol=5, robot_offset=SENSOR_OFFSET_DETECT,
+                    orient_backward_ok=False, move_backward_ok=True
+                ))
+                self._current_wps.append(
+                    None
+                )
+                # Pickup sequence
                 self._current_wps.append((
                     (0,0),
                     GATE_UP,
                     1
                 ))
                 self._current_wps.append(block_wp)
-                
-                # Check the colour
-                self._current_wps.append(
-                    None
-                )
-                # Put the gate down
                 self._current_wps.append((
                     (0,0),
                     GATE_DOWN,
                     1
                 ))
-
-                # Reverse a bit
                 self._current_wps.append((
                     BACKWARD,
                     GATE_DOWN,

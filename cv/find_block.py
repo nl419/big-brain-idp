@@ -33,11 +33,11 @@ def find_block(image: np.ndarray, shift: np.ndarray, invmat: np.ndarray, angle_o
     cropped = crop_board(image.copy(), shift, invmat, get_pickup_corners(shift, invmat))
     
     if _DEBUG:
-        cv2.imshow("mask", mask_coloured)
+        cv2.imshow("cropped", cropped)
         cv2.waitKey(0)
-        cv2.destroyWindow("mask")
+        cv2.destroyWindow("cropped")
     # Mask the coloured areas
-    hMin = 0; sMin = 100; vMin = 80; hMax = 179; sMax = 255; vMax = 255
+    hMin = 0; sMin = 80; vMin = 80; hMax = 179; sMax = 255; vMax = 255
     hsv = cv2.cvtColor(cropped, cv2.COLOR_BGR2HSV)
     lower = np.array([hMin, sMin, vMin])
     upper = np.array([hMax, sMax, vMax])
@@ -134,10 +134,10 @@ def _test_find_block():
     # Find blocks in the pickup area of still images
 
     # image = cv2.imread("checkerboard2/3.jpg")
-    # image = cv2.imread("block_ims/2.jpg")
-    image = cv2.imread("dots/dot17.jpg")
+    image = cv2.imread("block_ims/2.jpg")
+    # image = cv2.imread("dots/dot17.jpg")
     image = undistort(image)
-    im2 = remove_shadow(image.copy())
+    im2 = remove_shadow(image.copy(), 101)
     shift, invmat, mat = get_shift_invmat_mat(im2)
     image = crop_board(image, shift, invmat)
     image = remove_shadow(image)
@@ -145,6 +145,8 @@ def _test_find_block():
     cv2.waitKey(0)
     cv2.destroyAllWindows()
     mid, forward = find_block(image, shift, invmat, 0)
+    from find_dots import undo_parallax
+    mid = undo_parallax(mid, 0.03)
 
     if mid is None:
         cv2.imshow("no block!", image)
@@ -154,8 +156,8 @@ def _test_find_block():
     front = mid + forward * 80
 
     cv2.drawMarker(image, np.int0(mid), (0,0,255), cv2.MARKER_CROSS,
-                   40, 2)
-    cv2.line(image, np.int0(mid), np.int0(front), (0,255,0), 4)
+                   40, 1)
+    cv2.line(image, np.int0(mid), np.int0(front), (0,255,0), 2)
 
     print(mid)
     print(forward)
