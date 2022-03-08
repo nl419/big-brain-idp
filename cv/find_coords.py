@@ -160,16 +160,32 @@ def dropoff_boxes(img: np.ndarray, shift=None, invmat=None):
     
     # Preprocess
     from unfisheye import undistort
-    from crop_board import crop_board, remove_shadow, kmeans
+    from crop_board import crop_board, remove_shadow, kmeans, untransform_board
     from find_coords import get_shift_invmat_mat
     image = img.copy()
     if shift is None or invmat is None:
         image2 = image.copy()
         image2 = remove_shadow(image2)
         shift, invmat, _ = get_shift_invmat_mat(image2)
-    image = crop_board(image, shift, invmat)
-    image = remove_shadow(image, 101)
+    dropoff_area = (
+        untransform_board(shift, invmat, np.array((-0.77739, -0.55168))),
+        untransform_board(shift, invmat, np.array((-0.77179, -1.26696))),
+        untransform_board(shift, invmat, np.array((0.72577, -1.32124))),
+        untransform_board(shift, invmat, np.array((0.74001, -0.60672)))
+    )
+    if _DEBUG:
+        cv2.imshow("before crop", image)
+        cv2.waitKey(0)
+        cv2.destroyWindow("before crop")
+    # image = crop_board(image, shift, invmat)
+    image = remove_shadow(image, 81)
+    image = crop_board(image, shift, invmat, dropoff_area)
+    if _DEBUG:
+        cv2.imshow("after crop", image)
+        cv2.waitKey(0)
+        cv2.destroyWindow("after crop")
     image = kmeans(image, 4)
+
 
     if _DEBUG:
         cv2.imshow("Kmeans", image)
@@ -177,7 +193,7 @@ def dropoff_boxes(img: np.ndarray, shift=None, invmat=None):
         cv2.destroyWindow("Kmeans")
 
     # Threshold for white
-    hMin = 0; sMin = 0; vMin = 70; hMax = 179; sMax = 40; vMax = 255
+    hMin = 0; sMin = 0; vMin = 120; hMax = 179; sMax = 40; vMax = 255
     lower = np.array([hMin, sMin, vMin])
     upper = np.array([hMax, sMax, vMax])
     hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
@@ -187,6 +203,14 @@ def dropoff_boxes(img: np.ndarray, shift=None, invmat=None):
         cv2.imshow("mask", mask)
         cv2.waitKey(0)
         cv2.destroyWindow("mask")
+
+    mask = cv2.erode(mask, (8,8), iterations=1)
+    mask = cv2.dilate(mask, (8,8), iterations=1)
+
+    if _DEBUG:
+        cv2.imshow("after opening", mask)
+        cv2.waitKey(0)
+        cv2.destroyWindow("after opening")
 
     # Filter out contours of wrong size
     # Calculate centres for the remaining contours
@@ -198,7 +222,6 @@ def dropoff_boxes(img: np.ndarray, shift=None, invmat=None):
         cv2.waitKey(0)
         cv2.destroyWindow("contours")
         image = img.copy()
-
 
     centres = []
     areas = []
@@ -226,17 +249,32 @@ def dropoff_boxes(img: np.ndarray, shift=None, invmat=None):
     reds = []
     shift, invmat, mat = get_shift_invmat_mat(img)
     from waypoints import BLUE_DROPOFFS_T, RED_DROPOFFS_T, untransform_board
+    fail_i = -1
     for i,t in enumerate(np.append(BLUE_DROPOFFS_T, RED_DROPOFFS_T, axis=0)):
         # Yes this is inefficient, but it's only ever run once or twice.
         est = untransform_board(shift, invmat, t)
         vecs = centres - est
         mags = np.linalg.norm(vecs, axis=1)
         j = np.argmin(mags)
-        assert mags[j] < 40, "Couldn't find valid box within 40px of estimate"
+        centre = centres[j]
+        if mags[j] > 40:
+            print(f"Dropoff location {i} was not found. Skipping...")
+            assert fail_i == -1, "Too many boxes couldn't be found."
+            fail_i = i
+            centre = None
         if i < 2:
-            blues.append(centres[j])
+            blues.append(centre)
         else:
-            reds.append(centres[j])
+            reds.append(centre)
+    
+    if fail_i != -1:
+        # Estimate failed box location based on other boxes
+        if fail_i < 2:
+            blues[fail_i] = blues[1-fail_i] + (reds[fail_i] - reds[1-fail_i])
+        else:
+            fail_i -= 2
+            reds[fail_i] = reds[1-fail_i] + (blues[fail_i] - blues[1-fail_i])
+
     return blues, reds
 
 def get_shift_invmat_mat(image: np.ndarray):
@@ -331,8 +369,8 @@ def _pick_points_normalised():
 
     # Return the points normalised by the barrier positions
 
-    image = cv2.imread('dots/dot7.jpg')
-    # image = cv2.imread('dots/dot4.jpg')
+    # image = cv2.imread('dots/dot17.jpg')
+    image = cv2.imread('dots/dot4.jpg')
     # image = cv2.imread('checkerboard2/3.jpg')
 
     image = undistort(image)
@@ -363,7 +401,7 @@ def _test_dropoff_boxes():
     from unfisheye import undistort
 
     # image = cv2.imread('new_board/1.jpg')
-    image = cv2.imread('dots/dot4.jpg')
+    image = cv2.imread('dropoff-boxes/5.jpg')
     # image = cv2.imread('checkerboard2/3.jpg')
 
     image = undistort(image)
@@ -378,5 +416,5 @@ def _test_dropoff_boxes():
 
 if __name__=="__main__":
     # _pick_points()
-    _pick_points_normalised()
-    # _test_dropoff_boxes()
+    # _pick_points_normalised()
+    _test_dropoff_boxes()
