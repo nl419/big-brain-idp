@@ -11,14 +11,14 @@ def nothing(x):
 
 invert_hue = False
 do_crop_board = False
-do_crop_pickup = True
+do_crop_pickup = False
 do_blur = False
 do_remove_shadow = False
 do_kmeans = False
 do_erode = False
 
 # Load in image
-image = cv2.imread('block_ims/2.jpg')
+image = cv2.imread('nav-test-fails/0.jpg')
 # image = cv2.imread('dots/dot3.jpg')
 # image = cv2.imread('dots/dot14.jpg')
 # image = cv2.imread('checkerboard2/3.jpg')
@@ -27,7 +27,7 @@ image = cv2.imread('block_ims/2.jpg')
 from unfisheye import undistort
 from crop_board import crop_board, remove_shadow, kmeans, get_pickup_corners
 from find_coords import get_shift_invmat_mat
-image = undistort(image)
+# image = undistort(image)
 if do_crop_board or do_crop_pickup:
     image2 = image.copy()
     image2 = remove_shadow(image2)
@@ -53,7 +53,7 @@ cv2.waitKey(0)
 SHOW_MASK = False # False => show entire image after threshold, True => just show mask
 
 # Set initial values
-hMin = 0; sMin = 100; vMin = 80; hMax = 179; sMax = 255; vMax = 255
+hMin = 140; sMin = 20; vMin = 160; hMax = 170; sMax = 255; vMax = 255
 
 # Create a window, scale it to fit screen
 # win = cv2.namedWindow('image', cv2.WINDOW_GUI_NORMAL + cv2.WINDOW_NORMAL)

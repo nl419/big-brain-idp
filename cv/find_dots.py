@@ -26,8 +26,8 @@ def getDotBbox(centres):
     bbox : np.ndarray or None
         The bounding box, if determined.
     """
-    minLength = 30
-    maxLength = 75
+    minLength = 20
+    maxLength = 50
     if len(centres) < 3:
         return False, None
     # Find a centre & corresponding pair of distance vectors which are perpendicular
@@ -61,7 +61,10 @@ def getDotBbox(centres):
     else:
         vec1 = vecs[i]
         vec2 = vecs[j]
-    bbox = [c, c + vec1, c + vec1 + vec2, c + vec2]
+    if DOT_PATTERN_DIR == -1: # TODO make this a rotation, not just "forward" or "backward"
+        bbox = [c + vec1 + vec2, c + vec2, c, c + vec1]
+    else: 
+        bbox = [c, c + vec1, c + vec1 + vec2, c + vec2]
     return True, np.int0(bbox)
 
 def getDots(image: np.ndarray):
@@ -99,7 +102,8 @@ def getDots(image: np.ndarray):
         area = M['m00']
         _DEBUG and print(area)
         _DRAW_MASKS and cv2.drawContours(contim, [c], -1, (0,255,0), 2)
-        if area > 250 and area < 700:
+        # if area > 200 and area < 750: # A3 dots
+        if area > 100 and area < 350: # A4 dots
             centre = (M['m10']/M['m00'], M['m01']/M['m00'])
             centre = np.array(centre)
             centres.append(centre)
@@ -191,10 +195,11 @@ def _test_transform():
 def _test_image():
     # load image
     # image = cv2.imread('checkerboard2/3.jpg') # No dots - shouldn't find any
-    image = cv2.imread('dots/dot17.jpg') # Dots - should find them
+    # image = cv2.imread('dots/smol2.jpg') # Dots - should find them
+    image = cv2.imread('nav-test-fails/3.jpg') # Dots - should find them
 
     # process image
-    image = undistort(image)
+    # image = undistort(image)
     centres = getDots(image)
     print(centres)
     found, bbox = getDotBbox(centres)
@@ -211,7 +216,12 @@ def _test_video():
     video = DotPatternVideo('http://localhost:8081/stream/video.mjpeg')
 
     while(1):
-        image, _,_,_ = video.find()
+        image, found,centre,front = video.find()
+        if found:
+            cv2.circle(image, np.int0(centre), 4, (255,255,0), -1)
+            cv2.circle(image, np.int0(front), 4, (255,255,0), -1)
+            cv2.circle(image, np.int0(get_CofR(centre, front)), 4, (255,255,0), -1)
+            cv2.circle(image, np.int0(untransform_coords(GATE_OFFSET, centre, front)), 4, (0,255,0), -1)
         # show image
         cv2.imshow('image', image)
         key = cv2.waitKey(1) & 0xFF
@@ -268,16 +278,15 @@ def angle(vec1: np.ndarray, vec2: np.ndarray):
         angle = -angle
     return angle
 
-def undo_parallax(coord: np.ndarray, height=0.1):
+def undo_parallax(coord: np.ndarray, height=0.11):
     # The dot pattern on the robot will appear to be further away
     # from the centre than it really is, due to parallax.
-
     # Similar triangles: 
     # 10 cm dot pattern height, 1.5 m camera height
     # smaller triangle = 1.5 m * 'a' m, bigger triangle = (1.5 + 0.1) m * 'a' * (1.6/1.5) m
     # Simply scale about the centre of the image to undo parallax
-    CAMERA_HEIGHT = 2.0
-    parallax_scale = CAMERA_HEIGHT / (height + CAMERA_HEIGHT)
+    CAMERA_HEIGHT = 1.63
+    parallax_scale = (CAMERA_HEIGHT - height) / CAMERA_HEIGHT
     parallax_shift = np.array((1016,760)) / 2
     shifted = coord - parallax_shift
     scaled = shifted * parallax_scale
@@ -365,5 +374,5 @@ class DotPatternVideo:
 
 if _DEBUG:
     # _test_transform()
-    # _test_video()
-    _test_image()
+    _test_video()
+    # _test_image()

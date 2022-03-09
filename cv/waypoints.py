@@ -10,6 +10,7 @@ class Waypoint:
     _target_pos: np.ndarray
     _target_orient: np.ndarray # which way the true forward dir should point, always unit length
     _pos_tol: float # pixels
+    _near_tol: float # pixels
     _orient_tol: float # radians
     _orient_backward_ok: bool
     _move_backward_ok: bool
@@ -20,7 +21,7 @@ class Waypoint:
 
     def __init__(self, target_pos: np.ndarray, target_orient: np.ndarray = None, 
                  pos_tol: float = 10, orient_tol: float = 5, robot_offset: np.ndarray = np.array((0,0)), 
-                 orient_backward_ok: bool = False, move_backward_ok: bool = True):
+                 orient_backward_ok: bool = False, move_backward_ok: bool = True, near_tol: float = 0):
         """A waypoint on the board. Run [Waypoint object].get_command(centre, front) 
         to get the next command & duration
 
@@ -40,7 +41,8 @@ class Waypoint:
             Whether aligning to the reverse orientation is ok, by default False
         move_backward_ok : bool, optional
             Whether moving backward for large distances is ok, by default True.
-            This parameter is only used if target_orient is None
+        near_tol : float
+            Threshold for reversing a little bit instead of doing large turns
         """
         self._target_pos = target_pos
         if target_orient is None:
@@ -52,6 +54,7 @@ class Waypoint:
         self._robot_offset = robot_offset
         self._orient_backward_ok = orient_backward_ok
         self._move_backward_ok = move_backward_ok
+        self._near_tol = near_tol
 
     def _get_rotation_noalign(self, centre, front):
         ### Assuming mag_tm is larger than mag_om_
@@ -68,7 +71,7 @@ class Waypoint:
         mag_om_ = np.linalg.norm(om_)
 
         if abs(mag_om_ < 3): # o is in front of CofR
-            theta = angle(tm, forward)
+            theta = -angle(tm, forward)
             if self._move_backward_ok:
                 # Limit rotations to between +-90 deg (+- pi/2 rad)
                 return (theta + np.pi/2) % np.pi - np.pi/2
@@ -151,6 +154,11 @@ class Waypoint:
 
         return np.linalg.norm(delta) if return_abs else np.dot(delta, f_unit)
 
+    def _get_abs_distance(self, centre, front):
+        o = untransform_coords(self._robot_offset, centre, front)
+        t = self._target_pos
+        return np.linalg.norm(t - o)
+
     def get_command(self, centre: np.ndarray, front: np.ndarray):
         """Get a motor command pair and duration in order to execute this waypoint
 
@@ -180,13 +188,9 @@ class Waypoint:
             # Make sure robot is near the target point
             dist = self._get_translation_align(centre, front, True)
             if dist > self._pos_tol:
-                # If nearly (but not quite) there, just reverse a bit.
-                if dist < 20:
-                    return BACKWARD, dist * 3 / MOVEMENT_SPEED
-
                 rot = self._get_rotation_align_CofR(centre, front)
                 # Tolerance for the intermediate rotation is fixed at 5 deg
-                if abs(rot) > np.radians(5):
+                if abs(rot) > np.radians(3):
                     command = RIGHT if rot > 0 else LEFT
                     return command, abs(rot) / ROTATION_SPEED
 
@@ -198,6 +202,12 @@ class Waypoint:
 
             # Make sure the robot is facing the right way
             rot = self._get_rotation_align_target(centre, front)
+            # If the rotation required is large, and we're near the target
+            abs_dist = self._get_abs_distance(centre, front)
+            if rot > np.radians(30) and abs_dist > self._pos_tol and abs_dist < self._near_tol:
+                # Reverse a little
+                return BACKWARD, self._near_tol * 2 / MOVEMENT_SPEED
+
             if abs(rot) > self._orient_tol:
                 command = RIGHT if rot > 0 else LEFT
                 return command, abs(rot) / ROTATION_SPEED
@@ -207,11 +217,14 @@ class Waypoint:
         
         # Should not align to a target orientation.
         rot = self._get_rotation_noalign(centre, front)
+        trans = self._get_translation_noalign(centre, front)
+        # If already close enough
+        if abs(trans) <= self._pos_tol: 
+            return None, 0
+        # Rotate first, then move.
         if abs(rot) > self._orient_tol:
             command = RIGHT if rot > 0 else LEFT
             return command, abs(rot) / ROTATION_SPEED
-
-        trans = self._get_translation_noalign(centre, front)
         if abs(trans) > self._pos_tol:
             command = FORWARD if trans > 0 else BACKWARD
             return command, abs(trans) / MOVEMENT_SPEED
@@ -259,15 +272,15 @@ BLUE_CORNER_T = np.array((-2.18769, 0.01154))
 # Ordered towards pickup, first & last are routing waypoints
 BLUE_CORNER_TS = np.array((
     (-1.28200, -0.67462),
-    (-1.80111, -0.14153),
-    (-1.80187, 0.18293),
+    (-1.79988, -0.21200),
+    (-1.80700, 0.15932),
     (-1.11507, 0.82523)
 ))
 RED_CORNER_T = np.array((2.25079, -0.00796))
 RED_CORNER_TS = np.array(( 
     (1.37965, -0.58829),
-    (1.89786, -0.19772),
-    (1.93512, 0.16831),
+    (1.90121, -0.22039),
+    (1.94007, 0.21116),
     (1.23903, 0.74794)
 ))
 PICKUP_CROSS_T = np.array((-0.04367, 1.02938))
@@ -539,7 +552,7 @@ def _test_waypoint():
     from find_coords import get_shift_invmat_mat
     from find_dots import getDots, getDotBbox, get_true_front, get_CofR
     from find_qr import drawMarkers
-    image = cv2.imread("dots/dot3.jpg")
+    image = cv2.imread("dots/dot17.jpg")
     image = undistort(image)
     image2 = image.copy()
     
@@ -571,9 +584,9 @@ def _test_waypoint():
 
     def redraw(target_pos):
         image = original.copy()
-        wp = Waypoint(target_pos=target_pos, target_orient=np.array((0,1)), 
-                  pos_tol=5, orient_tol=5, robot_offset=np.array((0,1)),
-                  move_backward_ok=True)
+        wp = Waypoint(target_pos=target_pos, target_orient=None, 
+                  pos_tol=40, orient_tol=5, robot_offset=np.array((-1,0)),
+                  move_backward_ok=False)
         command, duration = wp.get_command(centre, front)
         print(f"command: {command}")
         print(f"duration: {duration} s")
@@ -616,8 +629,8 @@ def _test_points():
     from unfisheye import undistort
     from crop_board import remove_shadow, crop_board
     from find_coords import get_shift_invmat_mat
-    image = cv2.imread("new_board/1.jpg")
-    # image = cv2.imread("dots/dot3.jpg")
+    # image = cv2.imread("new_board/1.jpg")
+    image = cv2.imread("dots/dot3.jpg")
     # image = cv2.imread("checkerboard2/3.jpg")
     image = undistort(image)
     image2 = image.copy()

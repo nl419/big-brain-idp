@@ -132,7 +132,7 @@ def barrier_centres(image: np.ndarray):
 
     return centres + middle
 
-def dropoff_boxes(img: np.ndarray, shift=None, invmat=None):
+def dropoff_boxes(img: np.ndarray, shift=None, invmat=None, improve_dropoff=True):
     """Find the dropoff boxes more accurately. Supply shift and invmat to
     make the processing faster.
 
@@ -144,6 +144,8 @@ def dropoff_boxes(img: np.ndarray, shift=None, invmat=None):
         The shift vector found with get_shift_invmat_mat(), default None
     invmat : np.ndarray
         The inverse matrix found with get_shift_invmat_mat(), default None
+    improve_dropoff : bool
+        Whether to improve the dropoff locations
 
     Returns
     -------
@@ -153,10 +155,6 @@ def dropoff_boxes(img: np.ndarray, shift=None, invmat=None):
         The coordinates of the red dropoff boxes
     """
     # Find the dropoff boxes
-    
-    # Threshold for white
-    # Do a hat (idk if its blackhat or tophat)
-    # Find the point that is nearest to the expected location of the cross
     
     # Preprocess
     from unfisheye import undistort
@@ -242,13 +240,18 @@ def dropoff_boxes(img: np.ndarray, shift=None, invmat=None):
         cv2.waitKey(0)
         cv2.destroyWindow("filtered")
 
+    from waypoints import BLUE_DROPOFFS_T, RED_DROPOFFS_T, untransform_board
+    shift, invmat, mat = get_shift_invmat_mat(img)
+    if not improve_dropoff:
+        return (untransform_board(shift, invmat, BLUE_DROPOFFS_T[0]),
+                untransform_board(shift, invmat, BLUE_DROPOFFS_T[1])),\
+               (untransform_board(shift, invmat, RED_DROPOFFS_T[0]),
+                untransform_board(shift, invmat, RED_DROPOFFS_T[1]))
 
     # Use the estimated locations from waypoints.py
     # Get the nearest contours to the estimates
     blues = []
     reds = []
-    shift, invmat, mat = get_shift_invmat_mat(img)
-    from waypoints import BLUE_DROPOFFS_T, RED_DROPOFFS_T, untransform_board
     fail_i = -1
     for i,t in enumerate(np.append(BLUE_DROPOFFS_T, RED_DROPOFFS_T, axis=0)):
         # Yes this is inefficient, but it's only ever run once or twice.
@@ -417,5 +420,5 @@ def _test_dropoff_boxes():
 
 if __name__=="__main__":
     # _pick_points()
-    _pick_points_normalised()
-    # _test_dropoff_boxes()
+    # _pick_points_normalised()
+    _test_dropoff_boxes()
