@@ -513,14 +513,19 @@ class Navigator:
                 # Check the colour of the block by sending a blank command
                 get_string = ip
                 if SEND_COMMANDS: self._ret_string = urllib.request.urlopen(get_string)
-                print("Reading sensor data.")
-                i = self._ret_string.find(SENSOR_DATA_TRIGGER)
-                assert i != -1, "Sensor data was not found."
-                i += len(SENSOR_DATA_TRIGGER)
-                j = self._ret_string[i:].find(END_SENSOR_DATA_TRIGGER)
-                assert j != -1, "End of sensor data was not found."
-                data = int(self._ret_string[i:i+j])
+                print("Reading sensor data...")
+                if SEND_COMMANDS:
+                    i = self._ret_string.find(SENSOR_DATA_TRIGGER)
+                    assert i != -1, "Sensor data was not found."
+                    i += len(SENSOR_DATA_TRIGGER)
+                    j = self._ret_string[i:].find(END_SENSOR_DATA_TRIGGER)
+                    assert j != -1, "End of sensor data was not found."
+                    data = int(self._ret_string[i:i+j])
+                else:
+                    data = 200 # dummy value
+                print(f"data {data}")
                 if self._last_reading == 0:
+                    print("Background levels measured.")
                     self._last_reading = data
                 elif data - self._last_reading > SENSOR_DELTA_THRESH:
                     print("Red block found.")
@@ -528,7 +533,8 @@ class Navigator:
                     self._last_reading = 0
                 else:
                     print("Blue block found.")
-                    if not DEBUG_WAYPOINTS: self._block_blue = True
+                    if DEBUG_WAYPOINTS: print("OVERRIDE: not updating block colour.")
+                    else: self._block_blue = True
                     self._last_reading = 0
                 # Don't send commands too quickly
                 time.sleep(MIN_COMMAND_INTERVAL / 1000)
@@ -566,11 +572,13 @@ class Navigator:
         self._command_timeout = now + duration + MIN_COMMAND_INTERVAL
         
         # Update not stuck threshold based on how much the robot should be moving
-        if abs(command[0]) > 150:
-            self._not_stuck_thresh = 5
-        elif command[0] != 0:
+        if command[0] != 0 and duration < 300: # A short duration command was given
             self._not_stuck_thresh = 2
-        else:
+        elif abs(command[0]) > 150: # A forward / backward command was given
+            self._not_stuck_thresh = 5
+        elif command[0] != 0: # A turn command was given
+            self._not_stuck_thresh = 2
+        else: # No movement was ordered.
             self._not_stuck_thresh = -1 
         return True
 

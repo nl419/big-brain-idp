@@ -276,7 +276,7 @@ def undo_parallax(coord: np.ndarray, height=0.1):
     # 10 cm dot pattern height, 1.5 m camera height
     # smaller triangle = 1.5 m * 'a' m, bigger triangle = (1.5 + 0.1) m * 'a' * (1.6/1.5) m
     # Simply scale about the centre of the image to undo parallax
-    CAMERA_HEIGHT = 1.5
+    CAMERA_HEIGHT = 2.0
     parallax_scale = CAMERA_HEIGHT / (height + CAMERA_HEIGHT)
     parallax_shift = np.array((1016,760)) / 2
     shifted = coord - parallax_shift
