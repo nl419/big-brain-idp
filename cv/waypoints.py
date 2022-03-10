@@ -287,12 +287,31 @@ def get_rot_mat(alpha: float):
     """
     cos = np.cos(alpha)
     sin = np.sin(alpha)
-    return np.array((cos, -sin), (sin, cos))
+    return np.array(((cos, -sin), (sin, cos)))
 
-def get_bbox_from_centre_front(centre, front):
-    # Note that this will not undo the parallax step
+def get_bbox_from_centre_front(centre: np.ndarray, front: np.ndarray) -> "tuple[np.ndarray]":
+    """Returns the bounding box coordinates corresponding to
+    given centre and front coords
 
-def predict_centre_front(centre, front, command, duration):
+    Parameters
+    ----------
+    centre : np.ndarray
+        Centre of the robot
+    front : np.ndarray
+        Front of the robot
+
+    Returns
+    -------
+    tuple of np.ndarray
+        List of bounding box points
+    """
+    forward = front - centre
+    right = perp(forward)
+    return centre + forward - right, centre + forward + right,\
+    centre - forward + right, centre - forward - right
+
+def predict_centre_front(centre: np.ndarray, front: np.ndarray,\
+    command: list or np.ndarray, duration: float) -> "tuple[np.ndarray, np.ndarray]":
     """Get the predicted positions of the centre and front
     of the robot
 
@@ -316,26 +335,26 @@ def predict_centre_front(centre, front, command, duration):
     """
     if type(command) is np.ndarray:
         command = command.tolist()
-    if command == FORWARD or command == BACKWARD\
-    or command == FORWARD_SLEW or command == BACKWARD_SLEW:
+    if (command == FORWARD).all() or (command == BACKWARD).all()\
+    or (command == FORWARD_SLEW).all() or (command == BACKWARD_SLEW).all():
         direction = 1
-        if command == BACKWARD or command == BACKWARD_SLEW:
+        if (command == BACKWARD).all() or (command == BACKWARD_SLEW).all():
             direction = -1
         speed = MOVEMENT_SPEED
-        if command == FORWARD_SLEW or command == BACKWARD_SLEW:
+        if (command == FORWARD_SLEW).all() or (command == BACKWARD_SLEW).all():
             speed = MOVEMENT_SPEED_SLEW
         # Get unit forward dir
         f_t = get_true_front(centre, front) - centre
         f_t = f_t / np.linalg.norm(f_t)
         delta = f_t * duration * direction * speed
         return centre + delta, front + delta
-    elif command == LEFT or command == LEFT_SLEW\
-    or command == RIGHT or command == RIGHT_SLEW:
+    elif (command == LEFT).all() or (command == LEFT_SLEW).all()\
+    or (command == RIGHT).all() or (command == RIGHT_SLEW).all():
         direction = 1 # +ve cw
-        if command == LEFT or command == LEFT_SLEW:
+        if (command == LEFT).all() or (command == LEFT_SLEW).all():
             direction = -1
         speed = ROTATION_SPEED
-        if command == LEFT_SLEW or command == RIGHT_SLEW:
+        if (command == LEFT_SLEW).all() or (command == RIGHT_SLEW).all():
             speed = ROTATION_SPEED_SLEW
         alpha = speed * duration * direction
         mat = get_rot_mat(alpha)
@@ -652,8 +671,7 @@ def _test_waypoint():
     from unfisheye import undistort
     from crop_board import remove_shadow, crop_board
     from find_coords import get_shift_invmat_mat
-    from find_dots import getDots, getDotBbox, get_true_front, get_CofR
-    from find_qr import drawMarkers
+    from find_dots import getDots, getDotBbox, get_true_front, get_CofR, drawMarkers
     # image = cv2.imread("dots/dot17.jpg")
     image = cv2.imread("dots/smol1.jpg")
     image = undistort(image)
@@ -693,33 +711,9 @@ def _test_waypoint():
         command, duration = wp.get_command(centre, front)
         print(f"command: {command}")
         print(f"duration: {duration} s")
-        if command[0] == FORWARD[0] and command[1] == FORWARD[1]\
-        or command[0] == BACKWARD[0] and command[1] == BACKWARD[1]:
-            dist = duration * MOVEMENT_SPEED
-            if command[0] == BACKWARD[0]:
-                dist = -dist
-            f_true = get_true_front(centre, front) - centre
-            end = centre + dist * (f_true / np.linalg.norm(f_true)) 
-            print(f"corresponding distance: {dist}")
-            cv2.line(image, np.int0(centre), np.int0(end), color=(0,0,255), thickness=2)
-        else:
-            alpha = duration * ROTATION_SPEED
-            if command[0] == LEFT[0]:
-                alpha = -alpha
-            # Draw on the new centre / front position, as well as CofR
-            m = get_CofR(centre, front)
-            sin = np.sin(alpha)
-            cos = np.cos(alpha)
-            mat = np.array(((cos, -sin), (sin, cos)))
-            cm = np.matmul(mat, centre - m)
-            fm = np.matmul(mat, front - m)
-            c_new = cm + m
-            f_new = fm + m
-            cv2.line(image, np.int0(c_new), np.int0(f_new), (0,0,255), 2)
-            cv2.circle(image, np.int0(c_new), 5, (0,0,255), -1)
-            cv2.circle(image, np.int0(f_new), 5, (0,0,255), -1)
-            cv2.circle(image, np.int0(m), 5, (255,255,0), -1)
-            print(f"corresponding angle: {np.degrees(alpha)}")
+        c_new, f_new = predict_centre_front(centre, front, command, duration)
+        bbox = get_bbox_from_centre_front(c_new, f_new)
+        drawMarkers(image, bbox, (0,255,0), False)
         wp.draw(image)
         cv2.imshow("image", image)
     
