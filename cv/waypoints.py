@@ -437,236 +437,6 @@ RED_POINT_BOX2_T = np.array((0.80650, -0.55608))
 # =====================================================================
 # =====================================================================
 
-# Generate waypoints to go to a blue dropoff location
-def generate_blue_waypoints(image, shift, invmat, count):
-    return 1
-
-# Generate waypoints to go to a red dropoff location
-def generate_red_waypoints(image, shift, invmat, count):
-    # BROKEN DO NOT USE
-    from find_coords import dropoff_boxes
-    blues, reds = dropoff_boxes(image)
-    red = reds[count]
-
-    corner = untransform_board(shift, invmat, RED_CORNER_T)
-    corner_pickup = untransform_board(shift, invmat, RED_POINT_PICKUP_T)
-    corner_dropoff = untransform_board(shift, invmat, RED_POINT_DROPOFF_T)
-
-    pickup = untransform_board(shift, invmat, PICKUP_CROSS_T)
-
-    # Corner, dropoff, corner, pickup
-
-    return (
-        (
-            Waypoint(red)
-        )
-    )
-
-
-
-def generate_waypoints(shift, invmat):
-
-    BLUE_CORNER = untransform_board(shift, invmat, BLUE_CORNER_T)
-    RED_CORNER = untransform_board(shift, invmat, RED_CORNER_T)
-    PICKUP_CROSS = untransform_board(shift, invmat, PICKUP_CROSS_T)
-    DROPOFF_CROSS = untransform_board(shift, invmat, DROPOFF_CROSS_T)
-
-    BRIDGE_MIDDLE = (PICKUP_CROSS + DROPOFF_CROSS) / 2
-
-    BLUE_DROPOFFS = np.array((
-        untransform_board(shift, invmat, BLUE_DROPOFFS_T[0]),
-        untransform_board(shift, invmat, BLUE_DROPOFFS_T[1])
-    ))
-    RED_DROPOFFS = np.array((
-        untransform_board(shift, invmat, RED_DROPOFFS_T[0]),
-        untransform_board(shift, invmat, RED_DROPOFFS_T[1])
-    ))
-
-    # Intermediate waypoints
-    BLUE_POINT_PICKUP = untransform_board(shift, invmat, BLUE_POINT_PICKUP_T)
-    BLUE_POINT_DROPOFF = untransform_board(shift, invmat, BLUE_POINT_DROPOFF_T)
-    BLUE_POINT_BOX1 = untransform_board(shift, invmat, BLUE_POINT_BOX1_T)
-    BLUE_POINT_BOX2 = untransform_board(shift, invmat, BLUE_POINT_BOX2_T)
-
-    RED_POINT_PICKUP = untransform_board(shift, invmat, RED_POINT_PICKUP_T)
-    RED_POINT_DROPOFF = untransform_board(shift, invmat, RED_POINT_DROPOFF_T)
-    RED_POINT_BOX1 = untransform_board(shift, invmat, RED_POINT_BOX1_T)
-    RED_POINT_BOX2 = untransform_board(shift, invmat, RED_POINT_BOX2_T)
-
-    HOME = untransform_board(shift, invmat, HOME_T)
-
-    ZEROS = np.array((0,0))
-    MECHANISM = np.array((1,0)) # Location of mechanism relative to robot pov
-
-    # Lists of waypoints to execute after a block is obtained
-    BLUE_WAYPOINTS = (
-        (
-            Waypoint(target_pos=BLUE_POINT_PICKUP, 
-                    target_orient=(BLUE_CORNER-BLUE_POINT_PICKUP),
-                    pos_tol=25, orient_tol=15, robot_offset=ZEROS,
-                    orient_backward_ok=False, move_backward_ok=False),
-            Waypoint(target_pos=BLUE_CORNER, 
-                    pos_tol=5, orient_tol=5, robot_offset=ZEROS, 
-                    orient_backward_ok=False, move_backward_ok=False),
-            Waypoint(target_pos=BLUE_POINT_DROPOFF, 
-                    pos_tol=25, orient_tol=15, robot_offset=ZEROS,
-                    orient_backward_ok=False, move_backward_ok=False),
-            Waypoint(target_pos=BLUE_POINT_BOX1,
-                    target_orient=(BLUE_DROPOFFS[0]-BLUE_POINT_BOX1),
-                    pos_tol=5, orient_tol=5, robot_offset=MECHANISM,
-                    orient_backward_ok=False, move_backward_ok=False),
-            Waypoint(target_pos=BLUE_DROPOFFS[0],
-                    pos_tol=2, orient_tol=2, robot_offset=MECHANISM,
-                    orient_backward_ok=False, move_backward_ok=False),
-        ),
-        (
-            Waypoint(target_pos=BLUE_POINT_PICKUP, 
-                    target_orient=(BLUE_CORNER-BLUE_POINT_PICKUP),
-                    pos_tol=25, orient_tol=15, robot_offset=ZEROS,
-                    orient_backward_ok=False, move_backward_ok=False),
-            Waypoint(target_pos=BLUE_CORNER, 
-                    pos_tol=5, orient_tol=5, robot_offset=ZEROS, 
-                    orient_backward_ok=False, move_backward_ok=False),
-            Waypoint(target_pos=BLUE_POINT_DROPOFF, 
-                    pos_tol=25, orient_tol=15, robot_offset=ZEROS,
-                    orient_backward_ok=False, move_backward_ok=False),
-            Waypoint(target_pos=BLUE_POINT_BOX2,
-                    target_orient=(BLUE_DROPOFFS[1]-BLUE_POINT_BOX2),
-                    pos_tol=5, orient_tol=5, robot_offset=MECHANISM,
-                    orient_backward_ok=False, move_backward_ok=False),
-            Waypoint(target_pos=BLUE_DROPOFFS[1],
-                    pos_tol=2, orient_tol=2, robot_offset=MECHANISM,
-                    orient_backward_ok=False, move_backward_ok=False),
-        )
-    )
-
-    RED_WAYPOINTS = (
-        (
-            Waypoint(target_pos=RED_POINT_PICKUP, 
-                    target_orient=(RED_CORNER-RED_POINT_PICKUP),
-                    pos_tol=25, orient_tol=15, robot_offset=ZEROS,
-                    orient_backward_ok=False, move_backward_ok=False),
-            Waypoint(target_pos=RED_CORNER, 
-                    pos_tol=5, orient_tol=5, robot_offset=ZEROS, 
-                    orient_backward_ok=False, move_backward_ok=False),
-            Waypoint(target_pos=RED_POINT_DROPOFF, 
-                    pos_tol=25, orient_tol=15, robot_offset=ZEROS,
-                    orient_backward_ok=False, move_backward_ok=False),
-            Waypoint(target_pos=RED_POINT_BOX1,
-                    target_orient=(RED_DROPOFFS[0]-RED_POINT_BOX1),
-                    pos_tol=5, orient_tol=5, robot_offset=MECHANISM,
-                    orient_backward_ok=False, move_backward_ok=False),
-            Waypoint(target_pos=RED_DROPOFFS[0],
-                    pos_tol=2, orient_tol=2, robot_offset=MECHANISM,
-                    orient_backward_ok=False, move_backward_ok=False),
-        ),
-        (
-            Waypoint(target_pos=RED_POINT_PICKUP, 
-                    target_orient=(RED_CORNER-RED_POINT_PICKUP),
-                    pos_tol=25, orient_tol=15, robot_offset=ZEROS,
-                    orient_backward_ok=False, move_backward_ok=False),
-            Waypoint(target_pos=RED_CORNER, 
-                    pos_tol=5, orient_tol=5, robot_offset=ZEROS, 
-                    orient_backward_ok=False, move_backward_ok=False),
-            Waypoint(target_pos=RED_POINT_DROPOFF, 
-                    pos_tol=25, orient_tol=15, robot_offset=ZEROS,
-                    orient_backward_ok=False, move_backward_ok=False),
-            Waypoint(target_pos=RED_POINT_BOX2,
-                    target_orient=(RED_DROPOFFS[1]-RED_POINT_BOX2),
-                    pos_tol=5, orient_tol=5, robot_offset=MECHANISM,
-                    orient_backward_ok=False, move_backward_ok=False),
-            Waypoint(target_pos=RED_DROPOFFS[1],
-                    pos_tol=2, orient_tol=2, robot_offset=MECHANISM,
-                    orient_backward_ok=False, move_backward_ok=False),
-        )
-    )
-
-    # 0 = go over bridge to pickup, 1 = go over bridge to dropoff
-    BRIDGE_WAYPOINTS = (
-        (
-            Waypoint(target_pos=DROPOFF_CROSS,
-                    target_orient=(BRIDGE_MIDDLE - DROPOFF_CROSS),
-                    pos_tol=10, orient_tol=5, robot_offset=ZEROS,
-                    orient_backward_ok=False, move_backward_ok=False),
-            Waypoint(target_pos=BRIDGE_MIDDLE,
-                    target_orient=None,
-                    pos_tol=40, orient_tol=5, robot_offset=ZEROS,
-                    orient_backward_ok=False, move_backward_ok=False),
-            Waypoint(target_pos=PICKUP_CROSS,
-                    target_orient=None,
-                    pos_tol=40, orient_tol=5, robot_offset=ZEROS,
-                    orient_backward_ok=False, move_backward_ok=False),
-        ),
-        (
-            Waypoint(target_pos=PICKUP_CROSS,
-                    target_orient=(BRIDGE_MIDDLE - PICKUP_CROSS),
-                    pos_tol=10, orient_tol=5, robot_offset=ZEROS,
-                    orient_backward_ok=False, move_backward_ok=False),
-            Waypoint(target_pos=BRIDGE_MIDDLE,
-                    target_orient=None,
-                    pos_tol=40, orient_tol=5, robot_offset=ZEROS,
-                    orient_backward_ok=False, move_backward_ok=False),
-            Waypoint(target_pos=DROPOFF_CROSS,
-                    target_orient=None,
-                    pos_tol=40, orient_tol=5, robot_offset=ZEROS,
-                    orient_backward_ok=False, move_backward_ok=False),
-        )
-    )
-
-    HOME_WAYPOINTS = (Waypoint(target_pos=HOME,
-                            target_orient=(DROPOFF_CROSS - HOME),
-                            pos_tol=10, orient_tol=5, robot_offset=ZEROS,
-                            orient_backward_ok=False, move_backward_ok=True))
-    
-    return BLUE_WAYPOINTS, RED_WAYPOINTS, BRIDGE_WAYPOINTS, HOME_WAYPOINTS
-
-def draw_points(image, shift, invmat):
-
-    BLUE_CORNER = untransform_board(shift, invmat, BLUE_CORNER_T)
-    RED_CORNER = untransform_board(shift, invmat, RED_CORNER_T)
-    PICKUP_CROSS = untransform_board(shift, invmat, PICKUP_CROSS_T)
-    DROPOFF_CROSS = untransform_board(shift, invmat, DROPOFF_CROSS_T)
-
-    BRIDGE_MIDDLE = (PICKUP_CROSS + DROPOFF_CROSS) / 2
-
-    BLUE_DROPOFFS = np.array((
-        untransform_board(shift, invmat, BLUE_DROPOFFS_T[0]),
-        untransform_board(shift, invmat, BLUE_DROPOFFS_T[1])
-    ))
-    RED_DROPOFFS = np.array((
-        untransform_board(shift, invmat, RED_DROPOFFS_T[0]),
-        untransform_board(shift, invmat, RED_DROPOFFS_T[1])
-    ))
-
-    # Intermediate waypoints
-    BLUE_POINT_PICKUP = untransform_board(shift, invmat, BLUE_POINT_PICKUP_T)
-    BLUE_POINT_DROPOFF = untransform_board(shift, invmat, BLUE_POINT_DROPOFF_T)
-    BLUE_POINT_BOX1 = untransform_board(shift, invmat, BLUE_POINT_BOX1_T)
-    BLUE_POINT_BOX2 = untransform_board(shift, invmat, BLUE_POINT_BOX2_T)
-
-    RED_POINT_PICKUP = untransform_board(shift, invmat, RED_POINT_PICKUP_T)
-    RED_POINT_DROPOFF = untransform_board(shift, invmat, RED_POINT_DROPOFF_T)
-    RED_POINT_BOX1 = untransform_board(shift, invmat, RED_POINT_BOX1_T)
-    RED_POINT_BOX2 = untransform_board(shift, invmat, RED_POINT_BOX2_T)
-
-    HOME = untransform_board(shift, invmat, HOME_T)
-
-    BLUES = [BLUE_CORNER, BLUE_DROPOFFS[0], BLUE_DROPOFFS[1],
-             BLUE_POINT_PICKUP, BLUE_POINT_DROPOFF,
-             BLUE_POINT_BOX1, BLUE_POINT_BOX2]
-    REDS =  [RED_CORNER, RED_DROPOFFS[0], RED_DROPOFFS[1],
-             RED_POINT_PICKUP, RED_POINT_DROPOFF,
-             RED_POINT_BOX1, RED_POINT_BOX2]
-    MISC =  [PICKUP_CROSS, DROPOFF_CROSS, BRIDGE_MIDDLE, HOME]
-
-    for p in BLUES:
-        cv2.drawMarker(image, np.int0(p), (255,0,0), cv2.MARKER_CROSS, 10, 2)
-    for p in REDS:
-        cv2.drawMarker(image, np.int0(p), (0,0,255), cv2.MARKER_CROSS, 10, 2)
-    for p in MISC:
-        cv2.drawMarker(image, np.int0(p), (0,255,0), cv2.MARKER_CROSS, 10, 2)
-    return image
-
 def _test_waypoint():
     from unfisheye import undistort
     from crop_board import remove_shadow, crop_board
@@ -688,62 +458,45 @@ def _test_waypoint():
     if not found:
         assert False, "Dots not found!"
     centre, front = drawMarkers(image, bbox, (255,0,0))
+    c_new, f_new = centre.copy(), front.copy()
     print(centre, front)
     original = image.copy()
 
     target_pos = np.array((100,100))
 
     def click_event(event, x, y, flags, params):
+        nonlocal target_pos, centre, front, c_new, f_new
         # checking for left mouse clicks
         if event == cv2.EVENT_LBUTTONDOWN:
-            new_pos = np.array((x,y))
+            target_pos = np.array((x,y))
+            redraw()
 
-            # displaying the coordinates
-            # on the Shell
-            print(x, ' ', y)
-            redraw(new_pos)
-
-    def redraw(target_pos):
+    def redraw():
+        nonlocal target_pos, centre, front, c_new, f_new
         image = original.copy()
+        cv2.drawMarker(image, np.int0(centre), (255,0,0), cv2.MARKER_CROSS, 30, 2)
+        cv2.drawMarker(image, np.int0(front), (255,0,0), cv2.MARKER_CROSS, 30, 2)
         wp = Waypoint(target_pos=target_pos, target_orient=None, 
-                  pos_tol=20, orient_tol=5, robot_offset=np.array((1,1)),
-                  move_backward_ok=True)
+                  pos_tol=20, orient_tol=5, robot_offset=COFR_OFFSET,
+                  move_backward_ok=False)
         command, duration = wp.get_command(centre, front)
         print(f"command: {command}")
         print(f"duration: {duration} s")
+        print(c_new, f_new)
         c_new, f_new = predict_centre_front(centre, front, command, duration)
+        print(c_new, f_new)
         bbox = get_bbox_from_centre_front(c_new, f_new)
         drawMarkers(image, bbox, (0,255,0), False)
         wp.draw(image)
         cv2.imshow("image", image)
     
-    redraw(target_pos)
-    cv2.imshow("image", image)
+    cv2.namedWindow("image")
     cv2.setMouseCallback('image', click_event)
-    cv2.waitKey(0)
-
-def _test_points():
-    from unfisheye import undistort
-    from crop_board import remove_shadow, crop_board
-    from find_coords import get_shift_invmat_mat
-    # image = cv2.imread("new_board/1.jpg")
-    image = cv2.imread("dots/dot3.jpg")
-    # image = cv2.imread("checkerboard2/3.jpg")
-    image = undistort(image)
-    image2 = image.copy()
-    
-    # Preprocess
-    image2 = remove_shadow(image2)
-    shift, invmat, mat = get_shift_invmat_mat(image2)
-    image = crop_board(image, shift, invmat)
-    image = remove_shadow(image)
-
-
-    draw_points(image, shift, invmat)
-    cv2.imshow("image", image)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
+    while True:
+        redraw()
+        key = cv2.waitKey(0) & 0xFF
+        if key == ord('n'):
+            centre, front = c_new, f_new
 
 if __name__ == "__main__":
     _test_waypoint()
-    # _test_points()
