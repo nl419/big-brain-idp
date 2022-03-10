@@ -68,42 +68,6 @@ def getQRShape(points: list):
     return area, minDotp
 
 
-def drawMarkers(img: np.ndarray, points: "list[int]", lineColour: "list[int]"):
-    """Draws markers on the image for a QR code bounding box.
-    Also draws the forward-facing line
-
-    Parameters
-    ----------
-    img : np.ndarray
-        The image to draw onto
-    points : list[int]
-        List of (x,y) coordinates of the bounding box vertices
-    lineColour : list[int]
-        Colour (B,G,R) of lines joining the vertices
-    Returns
-    -------
-    centre : np.ndarray 
-        Centre of bounding box, to sub-pixel accuracay
-    front : np.ndarray
-        Front of bounding box, to sub-pixel accuracy
-    """
-    x = np.array(points, dtype=np.int0)
-    n = len(x)
-    for j in range(n):
-        p1 = tuple(x[j])
-        p2 = tuple(x[(j+1) % n])
-        cv2.line(img, p1, p2, lineColour, 3)
-
-    centre = np.mean(points, axis=0)
-    top_midpoint = np.mean(points[0:2], axis=0)
-    marker_radius = 5
-    cv2.circle(img, np.int0(centre), radius=marker_radius,
-               color=(0, 0, 255), thickness=-1)
-    cv2.circle(img, np.int0(top_midpoint), radius=marker_radius,
-               color=(0, 0, 255), thickness=-1)
-    cv2.line(img, np.int0(centre), np.int0(top_midpoint), color=(0, 0, 255), thickness=3)
-    return centre, top_midpoint
-
 from laggy_video import VideoCapture
 from unfisheye import undistort
 

@@ -1,6 +1,5 @@
 import cv2
 import numpy as np
-from find_qr import drawMarkers
 from unfisheye import undistort
 from laggy_video import VideoCapture
 from crop_board import crop_board
@@ -9,6 +8,54 @@ from robot_properties import *
 # Flag to print debug information
 _DEBUG = __name__ == "__main__"
 _DRAW_MASKS = True and _DEBUG
+
+def drawMarkers(img: np.ndarray, points: "list[int]", lineColour: "list[int]", removeParallax: bool = True):
+    """Draws markers on the image for a four point bounding box.
+    Also draws the forward-facing line. Removes effects of parallax
+    by default.
+
+    Parameters
+    ----------
+    img : np.ndarray
+        The image to draw onto
+    points : list[int]
+        List of (x,y) coordinates of the bounding box vertices
+    lineColour : list[int]
+        Colour (B,G,R) of lines joining the vertices
+    removeParallax : bool, optional
+        Whether to remove parallax, default True
+    Returns
+    -------
+    centre : np.ndarray 
+        Centre of bounding box, to sub-pixel accuracay
+    front : np.ndarray
+        Front of bounding box, to sub-pixel accuracy
+    """
+    # Draw bounding box
+    if removeParallax: 
+        unparallaxed_points = []
+        for j,p in enumerate(points):
+            p1 = np.int0(undo_parallax(p))
+            p2 = np.int0(undo_parallax(points[(j+1) % len(points)]))
+            unparallaxed_points.append(undo_parallax(p))
+            cv2.line(img, p1, p2, lineColour, 3)
+        points = np.array(unparallaxed_points)
+    else:
+        for j,p in enumerate(points):
+            p1 = np.int0(p)
+            p2 = np.int0(points[(j+1) % len(points)])
+            cv2.line(img, p1, p2, lineColour, 3)
+
+    # Find salient coordinates
+    centre = np.mean(points, axis=0)
+    top_midpoint = np.mean(points[0:2], axis=0)
+    marker_radius = 5
+    cv2.circle(img, np.int0(centre), radius=marker_radius,
+               color=(0, 0, 255), thickness=-1)
+    cv2.circle(img, np.int0(top_midpoint), radius=marker_radius,
+               color=(0, 0, 255), thickness=-1)
+    cv2.line(img, np.int0(centre), np.int0(top_midpoint), color=(0, 0, 255), thickness=3)
+    return centre, top_midpoint
 
 def getDotBbox(centres):
     """Given a list of centres of contours (of the correct area), returns
@@ -195,16 +242,16 @@ def _test_transform():
 def _test_image():
     # load image
     # image = cv2.imread('checkerboard2/3.jpg') # No dots - shouldn't find any
-    # image = cv2.imread('dots/smol2.jpg') # Dots - should find them
-    image = cv2.imread('nav-test-fails/3.jpg') # Dots - should find them
+    image = cv2.imread('dots/smol1.jpg') # Dots - should find them
+    # image = cv2.imread('nav-test-fails/3.jpg') # Dots - should find them
 
     # process image
-    # image = undistort(image)
+    image = undistort(image, 0.4)
     centres = getDots(image)
     print(centres)
     found, bbox = getDotBbox(centres)
     if found:
-        drawMarkers(image, bbox, (255,0,0))
+        drawMarkers(image, bbox, (255,0,0), True)
     
     # show image
     cv2.imshow('image', image)
@@ -283,9 +330,9 @@ def undo_parallax(coord: np.ndarray, height=0.11):
     # from the centre than it really is, due to parallax.
     # Similar triangles: 
     # 10 cm dot pattern height, 1.5 m camera height
-    # smaller triangle = 1.5 m * 'a' m, bigger triangle = (1.5 + 0.1) m * 'a' * (1.6/1.5) m
+    # smaller triangle = 1.63 m * 'a' m, bigger triangle = (1.5 + 0.1) m * 'a' * (1.6/1.5) m
     # Simply scale about the centre of the image to undo parallax
-    CAMERA_HEIGHT = 1.63
+    CAMERA_HEIGHT = 1.8 # 1.63
     parallax_scale = (CAMERA_HEIGHT - height) / CAMERA_HEIGHT
     parallax_shift = np.array((1016,760)) / 2
     shifted = coord - parallax_shift
@@ -353,7 +400,7 @@ class DotPatternVideo:
         front = None
         if found:
             centre, front = drawMarkers(frame, bbox, (255, 0, 0))
-            centre, front = undo_parallax(centre), undo_parallax(front)
+            # centre, front = undo_parallax(centre), undo_parallax(front)
         else: # not found
             annotate and cv2.putText(frame, "Dot pattern not detected", (100, 150),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0, 0, 255), 2)
@@ -374,5 +421,5 @@ class DotPatternVideo:
 
 if _DEBUG:
     # _test_transform()
-    _test_video()
-    # _test_image()
+    # _test_video()
+    _test_image()

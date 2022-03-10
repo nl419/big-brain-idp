@@ -271,6 +271,102 @@ class Waypoint:
         end = np.int0(self._target_pos + orient_inv_rot * 50)
         cv2.line(image, start, end, colour, 2)
 
+def get_rot_mat(alpha: float):
+    """Returns the rotation matrix corresponding to `alpha`
+    radians clockwise.
+
+    Parameters
+    ----------
+    alpha : float
+        The angle to rotate by, +ve clockwise, in radians
+
+    Returns
+    -------
+    np.ndarray
+        Matrix corresponding to the rotation
+    """
+    cos = np.cos(alpha)
+    sin = np.sin(alpha)
+    return np.array((cos, -sin), (sin, cos))
+
+def get_bbox_from_centre_front(centre, front):
+    # Note that this will not undo the parallax step
+
+def predict_centre_front(centre, front, command, duration):
+    """Get the predicted positions of the centre and front
+    of the robot
+
+    Parameters
+    ----------
+    centre : np.ndarray
+        Centre of the robot
+    front : np.ndarray
+        Front of the robot
+    command : list or np.ndarray
+        The motor commands to run
+    duration : float
+        Duration of command in seconds
+
+    Returns
+    -------
+    new_centre: np.ndarray
+        Location of centre of the robot after command
+    new_front: np.ndarray
+        Location of front of the robot after command
+    """
+    if type(command) is np.ndarray:
+        command = command.tolist()
+    if command == FORWARD or command == BACKWARD\
+    or command == FORWARD_SLEW or command == BACKWARD_SLEW:
+        direction = 1
+        if command == BACKWARD or command == BACKWARD_SLEW:
+            direction = -1
+        speed = MOVEMENT_SPEED
+        if command == FORWARD_SLEW or command == BACKWARD_SLEW:
+            speed = MOVEMENT_SPEED_SLEW
+        # Get unit forward dir
+        f_t = get_true_front(centre, front) - centre
+        f_t = f_t / np.linalg.norm(f_t)
+        delta = f_t * duration * direction * speed
+        return centre + delta, front + delta
+    elif command == LEFT or command == LEFT_SLEW\
+    or command == RIGHT or command == RIGHT_SLEW:
+        direction = 1 # +ve cw
+        if command == LEFT or command == LEFT_SLEW:
+            direction = -1
+        speed = ROTATION_SPEED
+        if command == LEFT_SLEW or command == RIGHT_SLEW:
+            speed = ROTATION_SPEED_SLEW
+        alpha = speed * duration * direction
+        mat = get_rot_mat(alpha)
+        m = get_CofR(centre, front)
+        f_new = np.matmul(mat, front - m) + m
+        c_new = np.matmul(mat, centre - m) + m
+        return c_new, f_new
+    else: return centre, front
+
+
+# Generalises the idea of a list of actions to carry out
+# Returns all the commands to be run at once.
+class Subroutine:
+    def __init__(self) -> None:
+        # Grab a list of things to run
+        # Store them
+        pass
+
+    def _draw(self):
+        # Draw all the waypoints on
+        pass
+
+    def run(self):
+        # Return all the commands to be sent
+        pass
+
+# Generalises multiple subroutines being grouped together
+# Runs each of the routines one by one.
+class Routine:
+    def __init__(self) -> None:
+        pass
 
 # _T means transformed coordinates (relative to the yellow barriers)
 
