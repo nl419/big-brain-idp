@@ -17,13 +17,14 @@ from find_dots import *
 import time
 import math
 from robot_properties import *
-ip = "http://192.168.137.65"
+ip = "http://192.168.137.217"
 
 SEND_COMMANDS = True # whether to attempt to send commands to the ip address
 MIN_COMMAND_INTERVAL = 1500 # in ms
 DEBUG_WAYPOINTS = True
 IMPROVE_DROPOFF = False
 READ_SENSOR = True
+CHECK_STUCK = False
 
 TEST_CORNER = False # Whether to test the corner
 TEST_CORNER_BLUE = False # Whether the testing corner is blue
@@ -236,6 +237,7 @@ class Navigator:
     # TODO normalise delta with framerate
 
     _not_stuck_thresh: float = -1 # if _delta > _not_stuck_thresh, then not stuck.
+    _not_stuck_pos: np.ndarray = np.array((0,0))
     _stuck_since: int or None = None # ms, when the robot got stuck
     _stuck_counter: int # Counter to iterate through the stuck commands
 
@@ -267,7 +269,7 @@ class Navigator:
     _command_timeout: int = 0
 
     def __init__(self, videostream_url: str):
-        self._video = DotPatternVideo(videostream_url)
+        self._video = DotPatternVideo(videostream_url, 0.1)
         frame, _,_,_ = self._video.find(annotate=False)
         self._shift, self._invmat, self._mat = get_shift_invmat_mat(frame)
         self._blues, self._reds = dropoff_boxes(frame, self._shift, self._invmat, IMPROVE_DROPOFF)
@@ -366,7 +368,7 @@ class Navigator:
             (
                 (0,0),
                 GATE_UP,
-                1, # In seconds
+                -MIN_COMMAND_INTERVAL/1000, # In seconds
                 None 
             ),
             (
@@ -378,7 +380,7 @@ class Navigator:
             (
                 (0,0),
                 GATE_DOWN,
-                0.5,
+                -MIN_COMMAND_INTERVAL/1000,
                 None
             )
         ]
@@ -495,8 +497,9 @@ class Navigator:
 
         # Check for stuck, 
         now = round(time.time() * 1000)
-        if self._delta > self._not_stuck_thresh: 
+        if np.linalg.norm(self._centre - self._not_stuck_pos) > self._not_stuck_thresh: 
             self._stuck_since = None
+            self._not_stuck_pos = self._centre
         elif self._stuck_since is None: 
             self._stuck_since = now
             print("Stuck detected")
@@ -592,15 +595,17 @@ class Navigator:
         print(f"sending command {get_string}")
         self._command_timeout = now + duration + MIN_COMMAND_INTERVAL
         
+        if not CHECK_STUCK: return True
+
         # Update not stuck threshold based on how much the robot should be moving
-        # if command[0] != 0 and duration < 300: # A short duration command was given
-        #     self._not_stuck_thresh = 2
-        # elif abs(command[0]) > 150: # A forward / backward command was given
-        #     self._not_stuck_thresh = 5
-        # elif command[0] != 0: # A turn command was given
-        #     self._not_stuck_thresh = 2
-        # else: # No movement was ordered.
-        #     self._not_stuck_thresh = -1 
+        if command[0] != 0 and duration < 300: # A short duration command was given
+            self._not_stuck_thresh = 2
+        elif abs(command[0]) > 150: # A forward / backward command was given
+            self._not_stuck_thresh = 5
+        elif command[0] != 0: # A turn command was given
+            self._not_stuck_thresh = 2
+        else: # No movement was ordered.
+            self._not_stuck_thresh = -1 
         return True
 
     def _update_state(self, reuse_frame: bool = False):
@@ -608,11 +613,7 @@ class Navigator:
         # Returns False if the state was not properly updated
         if not reuse_frame: 
             self._frame, self._found, new_c, new_f = self._video.find(shift=self._shift, invmat=self._invmat)
-            if not self._found:
-                if DEBUG_WAYPOINTS:
-                    new_c = np.array((800,200))
-                    new_f = np.array((700,300))
-                else: return False
+            if not self._found: return False
             self._delta = max(np.linalg.norm(new_c - self._centre), np.linalg.norm(new_f - self._front))
             self._centre = new_c
             self._front = new_f
@@ -628,7 +629,7 @@ class Navigator:
                     return True
                 self._current_wps.extend(self._blue_corner_wps[1] if self._block_blue else self._red_corner_wps[1])
                 i = self._blue_count if self._block_blue else self._red_count
-                assert i < 2, "Too many " + "blue" if self._block_blue else "red" + " blocks have been found"
+                assert i < 2, "Too many " + ("blue" if self._block_blue else "red") + " blocks have been found"
                 # Put the very last block in backwards, so that home can still be driven to easily
                 if (self._red_count == 2 or self._blue_count == 2) and i == 1:
                     i = 2
@@ -699,7 +700,7 @@ class Navigator:
                 # Read background lighting conds
                 self._current_wps.append(Waypoint(
                     target_pos=b_c, pos_tol=5, robot_offset=SENSOR_OFFSET_NO_DETECT,
-                    orient_backward_ok=False, move_backward_ok=True
+                    orient_backward_ok=False, move_backward_ok=False
                 ))
                 self._current_wps.append(
                     None
@@ -707,7 +708,7 @@ class Navigator:
                 # Read block lighting conds
                 self._current_wps.append(Waypoint(
                     target_pos=b_c, pos_tol=5, robot_offset=SENSOR_OFFSET_DETECT,
-                    orient_backward_ok=False, move_backward_ok=True
+                    orient_backward_ok=False, move_backward_ok=False
                 ))
                 self._current_wps.append(
                     None
@@ -772,14 +773,18 @@ class Navigator:
                 - Block not found
                 - Waypoint calculation failed
         """
-        # Get the next frame, process it, send commands to robot.
+        # Grab next frame, update waypoints etc.
+        ok = self._update_state() 
         
-        ok = self._update_state() # Grab next frame, update state
+        # Add annotations
         cv2.circle(self._frame, np.int0(self._centre), 4, (255,255,0), -1)
         cv2.circle(self._frame, np.int0(self._front), 4, (255,255,0), -1)
         cv2.circle(self._frame, np.int0(get_CofR(self._centre, self._front)), 4, (255,255,0), -1)
+        cv2.drawMarker(self._frame, np.int0(self._not_stuck_pos), (0,0,255), cv2.MARKER_CROSS, 20, 2)
         if len(self._current_wps) > 0 and self._wp_counter < len(self._current_wps):
             self._draw_wp(self._current_wps[self._wp_counter])
+        
+        # Skip this frame if state update failed
         if not ok: return self._frame, False
         self._wps_up_to_date = True # If we got here, the waypoints must be ok.
 
@@ -803,15 +808,16 @@ def _test_navigator():
         key = cv2.waitKey(1) & 0xFF
         if key == ord('q'):
             break
-        elif key == ord('n'):
-            nav._wp_counter += 1
-        elif key == ord('b'):
-            nav._block_blue = True
-        elif key == ord('r'):
-            nav._block_blue = False
-        elif key == ord('w'):
+        if key == ord('w'):
             cv2.imwrite("nav-test-fails/" + str(write_count) + ".jpg", frame)
             write_count += 1
+        if DEBUG_WAYPOINTS:
+            if key == ord('n'):
+                nav._wp_counter += 1
+            elif key == ord('b'):
+                nav._block_blue = True
+            elif key == ord('r'):
+                nav._block_blue = False
     cv2.destroyAllWindows()
 
 

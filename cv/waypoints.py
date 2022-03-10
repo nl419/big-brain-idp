@@ -21,7 +21,7 @@ class Waypoint:
 
     def __init__(self, target_pos: np.ndarray, target_orient: np.ndarray = None, 
                  pos_tol: float = 10, orient_tol: float = 5, robot_offset: np.ndarray = np.array((0,0)), 
-                 orient_backward_ok: bool = False, move_backward_ok: bool = True, near_tol: float = 0):
+                 orient_backward_ok: bool = False, move_backward_ok: bool = True, near_tol: float = -1):
         """A waypoint on the board. Run [Waypoint object].get_command(centre, front) 
         to get the next command & duration
 
@@ -42,7 +42,7 @@ class Waypoint:
         move_backward_ok : bool, optional
             Whether moving backward for large distances is ok, by default True.
         near_tol : float
-            Threshold for reversing a little bit instead of doing large turns
+            Threshold for reversing a little bit instead of doing large turns, default -1
         """
         self._target_pos = target_pos
         if target_orient is None:
@@ -78,12 +78,12 @@ class Waypoint:
             # Limit rotations to between +-180 deg (+- pi rad)
             return (theta + np.pi) % (np.pi * 2) - np.pi
 
-        theta = angle(tm, om_)
+        theta = -angle(tm, om_)
         # If we can reverse into the target, align with the reverse direction.
-        direction = 1
+        direction = -1
         if theta < 0 or not self._move_backward_ok: # closer to the forward direction
             theta = -theta
-            direction = -1
+            direction = 1
         alpha = (np.arccos(mag_om_ / mag_tm) - theta) * direction
         # Limit rotations to between +-180 deg (+- pi rad)
         return (alpha + np.pi) % (np.pi * 2) - np.pi
@@ -206,7 +206,7 @@ class Waypoint:
             abs_dist = self._get_abs_distance(centre, front)
             if rot > np.radians(30) and abs_dist > self._pos_tol and abs_dist < self._near_tol:
                 # Reverse a little
-                return BACKWARD, self._near_tol * 2 / MOVEMENT_SPEED
+                return BACKWARD, self._near_tol / MOVEMENT_SPEED
 
             if abs(rot) > self._orient_tol:
                 command = RIGHT if rot > 0 else LEFT
@@ -218,9 +218,15 @@ class Waypoint:
         # Should not align to a target orientation.
         rot = self._get_rotation_noalign(centre, front)
         trans = self._get_translation_noalign(centre, front)
-        # If already close enough
-        if abs(trans) <= self._pos_tol: 
+        abs_dist = self._get_abs_distance(centre, front)
+        # If already close enough, return None
+        if abs_dist <= self._pos_tol: 
             return None, 0
+        # If near, but not quite there, reverse a little
+        if abs_dist < self._near_tol and abs(rot) > np.radians(30):
+            # Reverse a little
+            return BACKWARD, self._near_tol / MOVEMENT_SPEED
+
         # Rotate first, then move.
         if abs(rot) > self._orient_tol:
             command = RIGHT if rot > 0 else LEFT
@@ -552,7 +558,8 @@ def _test_waypoint():
     from find_coords import get_shift_invmat_mat
     from find_dots import getDots, getDotBbox, get_true_front, get_CofR
     from find_qr import drawMarkers
-    image = cv2.imread("dots/dot17.jpg")
+    # image = cv2.imread("dots/dot17.jpg")
+    image = cv2.imread("dots/smol1.jpg")
     image = undistort(image)
     image2 = image.copy()
     
@@ -585,8 +592,8 @@ def _test_waypoint():
     def redraw(target_pos):
         image = original.copy()
         wp = Waypoint(target_pos=target_pos, target_orient=None, 
-                  pos_tol=40, orient_tol=5, robot_offset=np.array((-1,0)),
-                  move_backward_ok=False)
+                  pos_tol=20, orient_tol=5, robot_offset=np.array((1,1)),
+                  move_backward_ok=True)
         command, duration = wp.get_command(centre, front)
         print(f"command: {command}")
         print(f"duration: {duration} s")

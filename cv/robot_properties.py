@@ -9,11 +9,11 @@ RIGHT = -LEFT
 
 GATE_UP = 135
 GATE_DOWN = 45
-GATE_OFFSET = np.array((1.4,0))
+GATE_OFFSET = np.array((1.5,0))
 MIDDLE_OFFSET = np.array((0,0))
 
-SENSOR_OFFSET_DETECT = np.array((2.5,1))
-SENSOR_OFFSET_NO_DETECT = np.array((3.5,1))
+SENSOR_OFFSET_DETECT = np.array((2.5,0.7))
+SENSOR_OFFSET_NO_DETECT = np.array((3.5,0.7))
 
 # Was 44, 18
 MOVEMENT_SPEED = 50     # Forward/Backward movement speed in px/s on unscaled image
