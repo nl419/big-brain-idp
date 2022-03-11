@@ -400,20 +400,37 @@ class Subroutine:
         commands, durations, servo_poss, colour_threshs = [], [], [], []
         c_new = centre
         f_new = front
+        done = False
+        force_get_next = False
         for a in self._actions:
-            if type(a) is Waypoint:
-                command, duration = a.get_command(c_new, f_new)
-                servo_pos, check_colour = None, False
-            else: # 'a' is tuple of hardcoded commands
-                command, duration, servo_pos, check_colour = a
-            if command is not None:
+            while not done:
+                if type(a) is Waypoint:
+                    # Try to get a rotation
+                    command, duration = a.get_command(c_new, f_new, True)
+                    if command is None:
+                        # Must translate
+                        command, duration = a.get_command(c_new, f_new, False)
+                        # If translation commanded,
+                        if command is not None: done = True
+                    servo_pos, check_colour = None, False
+                else: # 'a' is tuple of hardcoded commands
+                    command, servo_pos, duration, check_colour = a
+                    force_get_next = True
+                if command is None:
+                    break # Waypoint complete
                 commands.append(command)
-                durations.append(durations)
+                durations.append(duration)
                 servo_poss.append(servo_pos)
                 colour_threshs.append(colour_thresh if check_colour else -1)
                 if not self._skip_checks:
-                    break
+                    done = True
                 c_new, f_new = predict_centre_front(c_new, f_new, command, duration)
+                if force_get_next:
+                    force_get_next = False
+                    break # Hardcoded command complete
+            else:
+                break # Done was true, so stop getting commands
+            
         return commands, servo_poss, durations, colour_threshs
 
 # _T means transformed coordinates (relative to the yellow barriers)
@@ -641,6 +658,98 @@ def _test_waypoint_list():
             break
 
 
+def _test_subroutine():
+    from unfisheye import undistort
+    from crop_board import remove_shadow, crop_board
+    from find_coords import get_shift_invmat_mat
+    from find_dots import getDots, getDotBbox, get_true_front, get_CofR, drawMarkers
+    # image = cv2.imread("dots/dot17.jpg")
+    image = cv2.imread("dots/smol1.jpg")
+    image = undistort(image)
+    image2 = image.copy()
+    
+    # Preprocess
+    image2 = remove_shadow(image2)
+    shift, invmat, mat = get_shift_invmat_mat(image2)
+    image = crop_board(image, shift, invmat)
+
+    untransform_board(shift, invmat, RED_CORNER_T)
+    dots = getDots(image)
+    found, bbox = getDotBbox(dots)
+    if not found:
+        assert False, "Dots not found!"
+    centre, front = drawMarkers(image, bbox, (255,0,0))
+    c_new, f_new = centre.copy(), front.copy()
+    print(centre, front)
+    original = image.copy()
+
+    target_pos = np.array((100,100))
+    offset = COFR_OFFSET
+    orient = np.array((1,0))
+
+    def click_event(event, x, y, flags, params):
+        nonlocal target_pos, offset
+        # checking for left mouse clicks
+        if event == cv2.EVENT_LBUTTONDOWN:
+            target_pos = np.array((x,y))
+            offset = COFR_OFFSET
+            redraw()
+
+    def redraw():
+        nonlocal target_pos, centre, front, c_new, f_new, offset, orient
+        image = original.copy()
+        cv2.drawMarker(image, np.int0(centre), (255,0,0), cv2.MARKER_CROSS, 30, 2)
+        cv2.drawMarker(image, np.int0(front), (255,0,0), cv2.MARKER_CROSS, 30, 2)
+        srt = Subroutine([
+            Waypoint(target_pos=target_pos, target_orient=orient, 
+                  pos_tol=20, orient_tol=5, robot_offset=offset,
+                  move_backward_ok=False),
+            (
+                CORNER_RIGHT if (offset==CORNER_RIGHT_OFFSET).all() else CORNER_LEFT,
+                None,
+                1/CORNER_SPEED,
+                False
+            )
+        ])
+        commands, _, durations, _ = srt.get_command_list(centre, front)
+        print(f"commands: {commands}")
+        print(f"durations: {durations}")
+        c_new, f_new = centre, front
+        for command, duration in zip(commands, durations):
+            c_new, f_new = predict_centre_front(c_new, f_new, command, duration)
+        print(c_new, f_new)
+        bbox = get_bbox_from_centre_front(c_new, f_new)
+        drawMarkers(image, bbox, (0,255,0), False)
+        srt.draw(image)
+        cv2.imshow("image", image)
+    
+    cv2.namedWindow("image")
+    cv2.setMouseCallback('image', click_event)
+    while True:
+        redraw()
+        key = cv2.waitKey(0) & 0xFF
+        if key == ord('n'):
+            centre, front = c_new, f_new
+        elif key == ord('q'):
+            break
+        # Testing cornering
+        elif key == ord('i'):
+            target_pos = untransform_board(shift, invmat, BLUE_BARRIER_T)
+            offset = CORNER_LEFT_OFFSET
+            orient = np.array((-1, 0))
+        elif key == ord('o'):
+            target_pos = untransform_board(shift, invmat, BLUE_BARRIER_T)
+            offset = CORNER_RIGHT_OFFSET
+            orient = np.array((0, -1))
+        elif key == ord('k'):
+            target_pos = untransform_board(shift, invmat, RED_BARRIER_T)
+            offset = CORNER_LEFT_OFFSET
+            orient = np.array((1, 0))
+        elif key == ord('l'):
+            target_pos = untransform_board(shift, invmat, RED_BARRIER_T)
+            offset = CORNER_RIGHT_OFFSET
+            orient = np.array((0, 1))
 if __name__ == "__main__":
-    _test_waypoint()
+    # _test_waypoint()
     # _test_waypoint_list()
+    _test_subroutine()
