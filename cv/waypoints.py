@@ -336,26 +336,26 @@ def predict_centre_front(centre: np.ndarray, front: np.ndarray,\
     if type(command) is np.ndarray:
         command = command.tolist()
     if (command == FORWARD).all() or (command == BACKWARD).all()\
-    or (command == FORWARD_SLEW).all() or (command == BACKWARD_SLEW).all():
+    or (command == FORWARD_FINE).all() or (command == BACKWARD_FINE).all():
         direction = 1
-        if (command == BACKWARD).all() or (command == BACKWARD_SLEW).all():
+        if (command == BACKWARD).all() or (command == BACKWARD_FINE).all():
             direction = -1
         speed = MOVEMENT_SPEED
-        if (command == FORWARD_SLEW).all() or (command == BACKWARD_SLEW).all():
-            speed = MOVEMENT_SPEED_SLEW
+        if (command == FORWARD_FINE).all() or (command == BACKWARD_FINE).all():
+            speed = MOVEMENT_SPEED_FINE
         # Get unit forward dir
         f_t = get_true_front(centre, front) - centre
         f_t = f_t / np.linalg.norm(f_t)
         delta = f_t * duration * direction * speed
         return centre + delta, front + delta
-    elif (command == LEFT).all() or (command == LEFT_SLEW).all()\
-    or (command == RIGHT).all() or (command == RIGHT_SLEW).all():
+    elif (command == LEFT).all() or (command == LEFT_FINE).all()\
+    or (command == RIGHT).all() or (command == RIGHT_FINE).all():
         direction = 1 # +ve cw
-        if (command == LEFT).all() or (command == LEFT_SLEW).all():
+        if (command == LEFT).all() or (command == LEFT_FINE).all():
             direction = -1
         speed = ROTATION_SPEED
-        if (command == LEFT_SLEW).all() or (command == RIGHT_SLEW).all():
-            speed = ROTATION_SPEED_SLEW
+        if (command == LEFT_FINE).all() or (command == RIGHT_FINE).all():
+            speed = ROTATION_SPEED_FINE
         alpha = speed * duration * direction
         mat = get_rot_mat(alpha)
         m = get_CofR(centre, front)
@@ -389,20 +389,28 @@ class Routine:
 
 # _T means transformed coordinates (relative to the yellow barriers)
 
-BLUE_CORNER_T = np.array((-2.18769, 0.01154))
+BLUE_CORNER_T = np.array((-1.90484, 0)) # 0.02536
+RED_CORNER_T = np.array((1.90484, 0)) # -0.00796 2.25079
 # Ordered towards pickup, first & last are routing waypoints
-BLUE_CORNER_TS = np.array((
-    (-1.28200, -0.67462),
-    (-1.79988, -0.21200),
-    (-1.80700, 0.15932),
+BLUE_CORNER_FORWARD_TS = np.array((
+    (-1.77714, -0.16240), # (-1.79356, -0.18146) (-1.80997, -0.20051)
+    BLUE_CORNER_T,
     (-1.11507, 0.82523)
 ))
-RED_CORNER_T = np.array((2.25079, -0.00796))
-RED_CORNER_TS = np.array(( 
-    (1.37965, -0.58829),
+BLUE_CORNER_BACKWARD_TS = np.array((
+    (-1.77395, 0.17771),
+    BLUE_CORNER_T,
+    (-1.28200, -0.67462),
+))
+RED_CORNER_FORWARD_TS = np.array((
     (1.90121, -0.22039),
-    (1.94007, 0.21116),
+    RED_CORNER_T,
     (1.23903, 0.74794)
+))
+RED_CORNER_BACKWARD_TS = np.array((
+    (1.94007, 0.21116),
+    RED_CORNER_T,
+    (1.37965, -0.58829),
 ))
 PICKUP_CROSS_T = np.array((-0.04367, 1.02938))
 DROPOFF_CROSS_T = np.array((-0.04001, -0.98237))
@@ -497,6 +505,90 @@ def _test_waypoint():
         key = cv2.waitKey(0) & 0xFF
         if key == ord('n'):
             centre, front = c_new, f_new
+        elif key == ord('q'):
+            break
+
+def _test_waypoint_list():
+    from unfisheye import undistort
+    from crop_board import remove_shadow, crop_board
+    from find_coords import get_shift_invmat_mat
+    from find_dots import getDots, getDotBbox, get_true_front, get_CofR, drawMarkers, get_outer_bbox
+    # image = cv2.imread("dots/dot17.jpg")
+    image = cv2.imread("dots/smol1.jpg")
+    image = undistort(image)
+    shift, invmat, _ = get_shift_invmat_mat(image)
+    waypoints = []
+    for w in np.concatenate((BLUE_CORNER_FORWARD_TS, BLUE_CORNER_BACKWARD_TS,
+        BLUE_DROPOFFS_T), axis = 0):
+        waypoints.append(untransform_board(shift, invmat, w))
+
+    waypoint_index = 0
+
+    image2 = image.copy()
+    
+    # Preprocess
+    image2 = remove_shadow(image2)
+    shift, invmat, mat = get_shift_invmat_mat(image2)
+    image = crop_board(image, shift, invmat)
+
+    untransform_board(shift, invmat, RED_CORNER_T)
+    dots = getDots(image)
+    found, bbox = getDotBbox(dots)
+    if not found:
+        assert False, "Dots not found!"
+    centre, front = drawMarkers(image, bbox, (255,0,0))
+    c_new, f_new = centre.copy(), front.copy()
+    print(centre, front)
+    original = image.copy()
+
+    target_pos = np.array((100,100))
+
+    def event(event, x, y, flags, params):
+        nonlocal target_pos
+        # checking for left mouse clicks
+        if event == cv2.EVENT_LBUTTONDOWN:
+            target_pos = np.array((x,y))
+            redraw()
+
+    def trackbar_event(event):
+        nonlocal waypoint_index, target_pos
+        print("hello!")
+        waypoint_index = cv2.getTrackbarPos("Waypoint index", "image")
+        target_pos = waypoints[waypoint_index]
+        redraw()
+
+    def redraw():
+        nonlocal target_pos, centre, front, c_new, f_new
+        image = original.copy()
+        cv2.drawMarker(image, np.int0(centre), (255,0,0), cv2.MARKER_CROSS, 30, 2)
+        cv2.drawMarker(image, np.int0(front), (255,0,0), cv2.MARKER_CROSS, 30, 2)
+        wp = Waypoint(target_pos=target_pos, target_orient=None, 
+                  pos_tol=20, orient_tol=5, robot_offset=COFR_OFFSET,
+                  move_backward_ok=False)
+        command, duration = wp.get_command(centre, front)
+        print(f"command: {command}")
+        print(f"duration: {duration} s")
+        print(c_new, f_new)
+        c_new, f_new = predict_centre_front(centre, front, command, duration)
+        print(c_new, f_new)
+        bbox = get_bbox_from_centre_front(c_new, f_new)
+        drawMarkers(image, bbox, (0,255,0), False)
+        drawMarkers(image, get_outer_bbox(c_new, f_new), (0,0,255), False)
+        wp.draw(image)
+        cv2.imshow("image", image)
+    
+    cv2.namedWindow("image")
+    cv2.createTrackbar('Waypoint index','image',0,len(waypoints)-1,trackbar_event)
+    cv2.setMouseCallback('image', event)
+    while True:
+        redraw()
+        key = cv2.waitKey(0) & 0xFF
+        if key == ord('n'):
+            centre, front = c_new, f_new
+        elif key == ord('q'):
+            break
+
 
 if __name__ == "__main__":
-    _test_waypoint()
+    # _test_waypoint()
+    _test_waypoint_list()
