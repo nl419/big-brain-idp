@@ -2,7 +2,6 @@
 Reads video stream from idpcam2, finds robot location & orientation,
 calculates motor commands to arrive at target location."""
 
-from cv2 import createBackgroundSubtractorKNN
 import numpy as np
 import cv2
 # For the example cases at bottom
@@ -12,12 +11,11 @@ from find_coords import untransform_board
 from find_coords import dropoff_boxes, get_shift_invmat_mat, transform_board
 from waypoints import *
 from find_block import find_block
-from find_qr import *
 from find_dots import *
 import time
 import math
 from robot_properties import *
-ip = "http://192.168.137.217"
+ip = "http://192.168.137.219"
 
 SEND_COMMANDS = True # whether to attempt to send commands to the ip address
 MIN_COMMAND_INTERVAL = 1500 # in ms
@@ -45,7 +43,7 @@ STUCK_COMMANDS = (
 )
 
 CALIBRATION_COMMANDS = (
-    (LEFT, 3),
+    (CORNER_RIGHT, 1/CORNER_SPEED),
     (FORWARD, 2)
 )
 
@@ -121,7 +119,7 @@ def centre_of_rotation (a0: np.ndarray, b0: np.ndarray, a1: np.ndarray, b1: np.n
     elif np.linalg.norm(db) < LENGTH_TOL:
         c = bhalf
     # If the vectors are very nearly parallel
-    elif np.cross(perp(da), perp(db)) / np.linalg.norm(da) / np.linalg.norm(db) < 0.01:
+    elif abs(np.cross(perp(da), perp(db))) / np.linalg.norm(da) / np.linalg.norm(db) < 0.01:
         c = seg_intersect(a0, b0, a1, b1)
     else: # all vectors are well behaved. find the centre.
         c = seg_intersect(ahalf, aperp, bhalf, bperp)
@@ -822,5 +820,5 @@ def _test_navigator():
 
 
 if __name__ == "__main__":
-    # _test_calibrate()
-    _test_navigator()
+    _test_calibrate()
+    # _test_navigator()

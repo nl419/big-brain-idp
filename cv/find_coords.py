@@ -372,11 +372,11 @@ def _pick_points_normalised():
 
     # Return the points normalised by the barrier positions
 
-    image = cv2.imread('dots/dot17.jpg')
-    # image = cv2.imread('dots/smol1.jpg')
+    # image = cv2.imread('dots/dot17.jpg')
+    image = cv2.imread('dots/smol1.jpg')
     # image = cv2.imread('checkerboard2/3.jpg')
 
-    image = undistort(image)
+    image = undistort(image, 0.4)
     image2 = image.copy()
     # Shadow removal on an uncropped image results in many artefacts,
     # but is helpful for reliable shift / mat calculation.

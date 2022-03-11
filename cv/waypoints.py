@@ -389,6 +389,9 @@ class Routine:
 
 # _T means transformed coordinates (relative to the yellow barriers)
 
+BLUE_BOUNDARY_T = np.array((-1.57657, 0.00544))
+RED_BOUNDARY_T = np.array((1.63555, -0.00785))
+
 BLUE_CORNER_T = np.array((-1.90484, 0)) # 0.02536
 RED_CORNER_T = np.array((1.90484, 0)) # -0.00796 2.25079
 # Ordered towards pickup, first & last are routing waypoints
@@ -471,21 +474,24 @@ def _test_waypoint():
     original = image.copy()
 
     target_pos = np.array((100,100))
+    offset = COFR_OFFSET
+    orient = np.array((1,0))
 
     def click_event(event, x, y, flags, params):
-        nonlocal target_pos, centre, front, c_new, f_new
+        nonlocal target_pos, offset
         # checking for left mouse clicks
         if event == cv2.EVENT_LBUTTONDOWN:
             target_pos = np.array((x,y))
+            offset = COFR_OFFSET
             redraw()
 
     def redraw():
-        nonlocal target_pos, centre, front, c_new, f_new
+        nonlocal target_pos, centre, front, c_new, f_new, offset, orient
         image = original.copy()
         cv2.drawMarker(image, np.int0(centre), (255,0,0), cv2.MARKER_CROSS, 30, 2)
         cv2.drawMarker(image, np.int0(front), (255,0,0), cv2.MARKER_CROSS, 30, 2)
-        wp = Waypoint(target_pos=target_pos, target_orient=None, 
-                  pos_tol=20, orient_tol=5, robot_offset=COFR_OFFSET,
+        wp = Waypoint(target_pos=target_pos, target_orient=orient, 
+                  pos_tol=20, orient_tol=5, robot_offset=offset,
                   move_backward_ok=False)
         command, duration = wp.get_command(centre, front)
         print(f"command: {command}")
@@ -507,6 +513,23 @@ def _test_waypoint():
             centre, front = c_new, f_new
         elif key == ord('q'):
             break
+        # Testing cornering
+        elif key == ord('i'):
+            target_pos = untransform_board(shift, invmat, BLUE_BOUNDARY_T)
+            offset = CORNER_LEFT_OFFSET
+            orient = np.array((-1, 0))
+        elif key == ord('o'):
+            target_pos = untransform_board(shift, invmat, BLUE_BOUNDARY_T)
+            offset = CORNER_RIGHT_OFFSET
+            orient = np.array((0, -1))
+        elif key == ord('k'):
+            target_pos = untransform_board(shift, invmat, RED_BOUNDARY_T)
+            offset = CORNER_LEFT_OFFSET
+            orient = np.array((1, 0))
+        elif key == ord('l'):
+            target_pos = untransform_board(shift, invmat, RED_BOUNDARY_T)
+            offset = CORNER_RIGHT_OFFSET
+            orient = np.array((0, 1))
 
 def _test_waypoint_list():
     from unfisheye import undistort
@@ -590,5 +613,5 @@ def _test_waypoint_list():
 
 
 if __name__ == "__main__":
-    # _test_waypoint()
-    _test_waypoint_list()
+    _test_waypoint()
+    # _test_waypoint_list()
