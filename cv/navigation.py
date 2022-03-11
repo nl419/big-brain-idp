@@ -175,6 +175,7 @@ def _test_calibrate():
                 if calibration_mode == 2: # Just finished a forward calibration
                     forward = centre - start_centre
                     print(f"forward {forward}")
+                    print(f"speed {forward / CALIBRATION_COMMANDS[calibration_mode-1][1]}")
                     true_front = transform_coords(centre, start_centre, start_front)
                     print(f"true_front {true_front}")
                     cv2.line(frame, np.int0(start_centre), np.int0(centre), (0,0,255), 3)
@@ -867,5 +868,5 @@ def _test_navigator():
 
 
 if __name__ == "__main__":
-    # _test_calibrate()
-    _test_navigator()
+    _test_calibrate()
+    # _test_navigator()

@@ -197,21 +197,33 @@ class Waypoint:
                     if dist < self._near_tol:
                         if rotation_only: return None, 0
                         return BACKWARD, self._near_tol / MOVEMENT_SPEED
-                    command = RIGHT if rot > 0 else LEFT
-                    return command, abs(rot) / ROTATION_SPEED
+                    duration = abs(rot) / ROTATION_SPEED
+                    if duration > FINE_THRESH:
+                        command = RIGHT if rot > 0 else LEFT
+                        return command, duration
+                    command = RIGHT_FINE if rot > 0 else LEFT_FINE
+                    return command, abs(rot) / ROTATION_SPEED_FINE
                 if rotation_only: return None, 0
 
                 # If we got here, then no turning was needed.
                 # Should now just head to the point.
                 trans = self._get_translation_align(centre, front)
-                command = FORWARD if trans > 0 else BACKWARD
-                return command, abs(trans) / MOVEMENT_SPEED
+                duration = abs(trans) / MOVEMENT_SPEED
+                if duration > FINE_THRESH:
+                    command = FORWARD if trans > 0 else BACKWARD
+                    return command, duration
+                command = FORWARD_FINE if trans > 0 else BACKWARD_FINE
+                return command, abs(trans) / MOVEMENT_SPEED_FINE
 
             # Make sure the robot is facing the right way
             rot = self._get_rotation_align_target(centre, front)
             if abs(rot) > self._orient_tol:
-                command = RIGHT if rot > 0 else LEFT
-                return command, abs(rot) / ROTATION_SPEED
+                duration = abs(rot) / ROTATION_SPEED
+                if duration > FINE_THRESH:
+                    command = RIGHT if rot > 0 else LEFT
+                    return command, duration
+                command = RIGHT_FINE if rot > 0 else LEFT_FINE
+                return command, abs(rot) / ROTATION_SPEED_FINE
 
             # No actions needed.
             return None, 0
@@ -231,12 +243,20 @@ class Waypoint:
 
         # Rotate first, then move.
         if abs(rot) > self._orient_tol:
-            command = RIGHT if rot > 0 else LEFT
-            return command, abs(rot) / ROTATION_SPEED
+            duration = abs(rot) / ROTATION_SPEED
+            if duration > FINE_THRESH:
+                command = RIGHT if rot > 0 else LEFT
+                return command, duration
+            command = RIGHT_FINE if rot > 0 else LEFT_FINE
+            return command, abs(rot) / ROTATION_SPEED_FINE
         if abs(trans) > self._pos_tol:
             if rotation_only: return None, 0
-            command = FORWARD if trans > 0 else BACKWARD
-            return command, abs(trans) / MOVEMENT_SPEED
+            duration = abs(trans) / MOVEMENT_SPEED
+            if duration > FINE_THRESH:
+                command = FORWARD if trans > 0 else BACKWARD
+                return command, duration
+            command = FORWARD_FINE if trans > 0 else BACKWARD_FINE
+            return command, abs(trans) / MOVEMENT_SPEED_FINE
 
         return None, 0
     
