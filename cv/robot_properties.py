@@ -2,23 +2,11 @@ import numpy as np
 
 DOT_PATTERN_DIR = -1 # -1 = forward in the 
 
+#------------------
+
 # Old motors:
-# FORWARD = np.array((-255,-250))
-# BACKWARD = -FORWARD
-# LEFT = np.array((100, -100))
-# RIGHT = -LEFT
-
-# MOVEMENT_SPEED = 50     # Forward/Backward movement speed in px/s on unscaled image
-# ROTATION_SPEED = 2 * np.pi / 14      # Radians per second
-
-# New motors:
-FINE_THRESH = 0.5 # in seconds
-FORWARD_FINE = np.array((-150,-150))
-BACKWARD_FINE = -FORWARD_FINE
-FORWARD = np.array((-255,-255))
+FORWARD = np.array((-255,-250))
 BACKWARD = -FORWARD
-LEFT_FINE = np.array((100,-100))
-RIGHT_FINE = -LEFT_FINE
 LEFT = np.array((255, -255))
 RIGHT = -LEFT
 
@@ -26,12 +14,41 @@ RIGHT = -LEFT
 CORNER_LEFT = np.array((-100, -255))
 CORNER_RIGHT = np.array((-255, -100))
 
-MOVEMENT_SPEED_FINE = 50     # Forward/Backward movement speed in px/s on unscaled image
-ROTATION_SPEED_FINE = 2 * np.pi / 15      # Radians per second
-MOVEMENT_SPEED = 150     # Forward/Backward movement speed in px/s on unscaled image
-ROTATION_SPEED = 2 * np.pi / 5      # Radians per second
+MOVEMENT_SPEED = 50     # Forward/Backward movement speed in px/s on unscaled image
+ROTATION_SPEED = 2 * np.pi / 4      # Radians per second
 CORNER_SPEED = 1 / 3.5 # Corners per second
 
+# NOT USED
+
+FORWARD_FINE = np.array((-150,-150))
+BACKWARD_FINE = -FORWARD_FINE
+LEFT_FINE = np.array((100,-100))
+RIGHT_FINE = -LEFT_FINE
+
+#------------------
+
+# New motors:
+# FINE_THRESH = 0.5 # in seconds
+# FORWARD_FINE = np.array((-150,-150))
+# BACKWARD_FINE = -FORWARD_FINE
+# FORWARD = np.array((-255,-255))
+# BACKWARD = -FORWARD
+# LEFT_FINE = np.array((100,-100))
+# RIGHT_FINE = -LEFT_FINE
+# LEFT = np.array((255, -255))
+# RIGHT = -LEFT
+
+# # Move forward and left/right, designed for going around the corner.
+# CORNER_LEFT = np.array((-100, -255))
+# CORNER_RIGHT = np.array((-255, -100))
+
+# MOVEMENT_SPEED_FINE = 50     # Forward/Backward movement speed in px/s on unscaled image
+# ROTATION_SPEED_FINE = 2 * np.pi / 15      # Radians per second
+# MOVEMENT_SPEED = 150     # Forward/Backward movement speed in px/s on unscaled image
+# ROTATION_SPEED = 2 * np.pi / 5      # Radians per second
+# CORNER_SPEED = 1 / 3.5 # Corners per second
+
+#------------------
 
 GATE_UP = 135
 GATE_DOWN = 45

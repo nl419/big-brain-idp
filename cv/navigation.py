@@ -15,7 +15,7 @@ from find_dots import *
 import time
 import math
 from robot_properties import *
-ip = "http://192.168.137.219"
+ip = "http://192.168.137.37"
 
 SEND_COMMANDS = True # whether to attempt to send commands to the ip address
 MIN_COMMAND_INTERVAL = 1500 # in ms
@@ -267,7 +267,7 @@ class Navigator:
     _command_timeout: int = 0
 
     def __init__(self, videostream_url: str):
-        self._video = DotPatternVideo(videostream_url, 0.1)
+        self._video = DotPatternVideo(videostream_url, 0.4)
         frame, _,_,_ = self._video.find(annotate=False)
         self._shift, self._invmat, self._mat = get_shift_invmat_mat(frame)
         self._blues, self._reds = dropoff_boxes(frame, self._shift, self._invmat, IMPROVE_DROPOFF)
@@ -284,7 +284,7 @@ class Navigator:
                         target_pos=untransform_board(self._shift, self._invmat, BLUE_POINT_DROPOFF_T),
                         pos_tol=40, move_backward_ok=False
                     )
-                ]),
+                ], just_once=tuple([True])),
                 Subroutine([
                     Waypoint(
                         target_pos=untransform_board(self._shift, self._invmat, BLUE_BARRIER_T),
@@ -298,13 +298,13 @@ class Navigator:
                         1/CORNER_SPEED,
                         False
                     )
-                ]),
+                ], just_once=(True, True)),
                 Subroutine([
                     Waypoint(
                         target_pos=untransform_board(self._shift, self._invmat, BLUE_POINT_PICKUP_T),
                         pos_tol=40, move_backward_ok=False
                     )
-                ])
+                ], just_once=tuple([True]))
             ),
             (
                 Subroutine([
@@ -326,7 +326,7 @@ class Navigator:
                         1/CORNER_SPEED,
                         False
                     )
-                ]),
+                ], just_once=(True, True)),
                 Subroutine([
                     Waypoint(
                         target_pos=untransform_board(self._shift, self._invmat, BLUE_POINT_DROPOFF_T),
@@ -343,13 +343,13 @@ class Navigator:
                         target_pos=untransform_board(self._shift, self._invmat, RED_POINT_DROPOFF_T),
                         pos_tol=40, move_backward_ok=False
                     )
-                ]),
+                ], just_once=tuple([True])),
                 Subroutine([
                     Waypoint(
                         target_pos=untransform_board(self._shift, self._invmat, RED_BARRIER_T),
                         target_orient=untransform_board(self._shift, self._invmat, RED_BARRIER_T + np.array((1,1))) - \
                         untransform_board(self._shift, self._invmat, RED_BARRIER_T),
-                        robot_offset=CORNER_LEFT_OFFSET, pos_tol=20, move_backward_ok=False
+                        robot_offset=CORNER_RIGHT_OFFSET, pos_tol=20, move_backward_ok=False
                     ),
                     (
                         CORNER_RIGHT,
@@ -357,13 +357,13 @@ class Navigator:
                         1/CORNER_SPEED,
                         False
                     )
-                ]),
+                ], just_once=(True, True)),
                 Subroutine([
                     Waypoint(
                         target_pos=untransform_board(self._shift, self._invmat, RED_POINT_PICKUP_T),
                         pos_tol=40, move_backward_ok=False
                     )
-                ])
+                ], just_once=tuple([True]))
             ),
             (
                 Subroutine([
@@ -371,13 +371,13 @@ class Navigator:
                         target_pos=untransform_board(self._shift, self._invmat, RED_POINT_PICKUP_T),
                         pos_tol=40, move_backward_ok=False
                     )
-                ]),
+                ], just_once=tuple([True])),
                 Subroutine([
                     Waypoint(
                         target_pos=untransform_board(self._shift, self._invmat, RED_BARRIER_T),
                         target_orient=untransform_board(self._shift, self._invmat, RED_BARRIER_T + np.array((1,-1))) - \
                         untransform_board(self._shift, self._invmat, RED_BARRIER_T),
-                        robot_offset=CORNER_RIGHT_OFFSET, pos_tol=20, move_backward_ok=False
+                        robot_offset=CORNER_LEFT_OFFSET, pos_tol=20, move_backward_ok=False
                     ),
                     (
                         CORNER_LEFT,
@@ -385,13 +385,13 @@ class Navigator:
                         1/CORNER_SPEED,
                         False
                     )
-                ]),
+                ], just_once=(True, True)),
                 Subroutine([
                     Waypoint(
                         target_pos=untransform_board(self._shift, self._invmat, RED_POINT_DROPOFF_T),
                         pos_tol=40, move_backward_ok=False
                     )
-                ])
+                ], just_once=tuple([True]))
             )
         )
 
@@ -409,7 +409,7 @@ class Navigator:
                 0.5,
                 None
             )
-        ])
+        ], just_once=(True, True))
 
         b_d_srts = [
             (
@@ -425,7 +425,7 @@ class Navigator:
                         target_pos=self._blues[0],
                         pos_tol=1, orient_tol=1, robot_offset=GATE_OFFSET
                     )
-                ], False)
+                ], skip_checks=False)
             ),
             (
                 Subroutine([
@@ -558,7 +558,6 @@ class Navigator:
         while True:
             # Handle being stuck
             gate_pos = None
-            shouldBlinkLED = None
             if self._stuck_since is not None and self._stuck_since > now + STUCK_TIME_THRESH:
                 print("Executing stuck command")
                 command, duration = STUCK_COMMANDS[self._stuck_counter]
@@ -580,8 +579,6 @@ class Navigator:
         get_string = ip + "/TRIGGER/"
         take_reading = False
         for i, (command, gate_pos, duration, colour_thresh) in enumerate(zip(commands, gate_poss, durations, colour_threshs)):
-            # Don't send more than 2 commands at once
-            if i >= 2: break
             # Turn that into a getString
             duration *= 1000 # Turn s into ms
             if math.isnan(duration): 
@@ -660,20 +657,20 @@ class Navigator:
         if not self._found and not DEBUG_WAYPOINTS:
             return False
 
-        if not self._wps_up_to_date:
-            self._current_wps = []
+        if not self._srts_up_to_date:
+            self._current_srts = []
             if self._got_block:
                 # Go to dropoff
                 if TEST_CORNER:
-                    self._current_wps.extend(self._blue_corner_wps[1] if TEST_CORNER_BLUE else self._red_corner_wps[1])
+                    self._current_srts.extend(self._blue_corner_srts[1] if TEST_CORNER_BLUE else self._red_corner_srts[1])
                     return True
-                self._current_wps.extend(self._blue_corner_wps[1] if self._block_blue else self._red_corner_wps[1])
+                self._current_srts.extend(self._blue_corner_srts[1] if self._block_blue else self._red_corner_srts[1])
                 i = self._blue_count if self._block_blue else self._red_count
                 assert i < 2, "Too many " + ("blue" if self._block_blue else "red") + " blocks have been found"
                 # Put the very last block in backwards, so that home can still be driven to easily
                 if (self._red_count == 2 or self._blue_count == 2) and i == 1:
                     i = 2
-                self._current_wps.extend(self._blue_dropoff_wps[i] if self._block_blue else self._red_dropoff_wps[i])
+                self._current_srts.extend(self._blue_dropoff_srts[i] if self._block_blue else self._red_dropoff_srts[i])
                 if self._block_blue:
                     self._blue_count += 1
                 else:
@@ -694,98 +691,106 @@ class Navigator:
 
                 # If all the blocks have been delivered, go home.
                 if self._blue_count == 2 and self._red_count == 2:
-                    self._current_wps = [self._home_wp]
+                    self._current_srts = [self._home_srt]
                     return True
+
+                # Do the corner
+                if TEST_CORNER:
+                    corner_srts = self._blue_corner_srts[0] if TEST_CORNER_BLUE else self._red_corner_srts[0]
+                else: corner_srts = self._blue_corner_srts[0] if self._block_blue else self._red_corner_srts[0]
+                self._current_srts.extend(corner_srts)
+                if TEST_CORNER: return True
+
                 # Make a route to pickup a block
                 b_c, _ = find_block(self._frame, self._shift, self._invmat)
                 if b_c is None:
                     if DEBUG_WAYPOINTS: b_c = np.array((300,600))
                     else: return False
                 b_c = undo_parallax(b_c, BLOCK_HEIGHT)
-                # Make a waypoint at the block
+                # Check if the block is near the wall
                 b_c_T = transform_board(self._shift, self._mat, b_c)
-                block_wp = Waypoint(
-                    target_pos=b_c, pos_tol=3, orient_tol=3, 
-                    robot_offset=GATE_OFFSET,
-                    orient_backward_ok=False, move_backward_ok=False
-                )
-                if TEST_CORNER:
-                    corner_wps = self._blue_corner_wps[0] if TEST_CORNER_BLUE else self._red_corner_wps[0]
-                else: corner_wps = self._blue_corner_wps[0] if self._block_blue else self._red_corner_wps[0]
-                self._current_wps.extend(corner_wps)
-                if TEST_CORNER: return True
-                # Avoid hitting the walls if the block is near the corner
-                route_wp = None
                 if b_c_T[1] > PICKUP_CENTRE_T[1]:
                     if b_c_T[0] > 0:
                         # Block is in the bottom right half of the pickup area
                         # So approach from the top
                         coord = b_c + np.array((0, -80))
                     else:
+                        # Block is in top left half, so approach from right
                         coord = b_c + np.array((80, 0))
-                    route_wp = Waypoint(
-                        target_pos=coord, target_orient=b_c-coord,
-                        pos_tol=3, orient_tol=3,
-                        robot_offset=GATE_OFFSET, move_backward_ok=False
-                    )
-                    self._current_wps.append(route_wp)
+                    self._current_srts.append(Subroutine([
+                        Waypoint(
+                            target_pos=coord, target_orient=b_c-coord,
+                            pos_tol=3, orient_tol=3,
+                            robot_offset=GATE_OFFSET, move_backward_ok=False
+                        )
+                    ]))
 
-                # Open gate
-                self._current_wps.append((
-                    (0,0),
-                    GATE_UP,
-                    1,
-                    None
-                ))
-                # Read background lighting conds
-                self._current_wps.append(Waypoint(
-                    target_pos=b_c, pos_tol=5, robot_offset=SENSOR_OFFSET_NO_DETECT,
-                    orient_backward_ok=False, move_backward_ok=False
-                ))
-                self._current_wps.append(
-                    None
-                )
-                # Read block lighting conds
-                self._current_wps.append(Waypoint(
-                    target_pos=b_c, pos_tol=5, robot_offset=SENSOR_OFFSET_DETECT,
-                    orient_backward_ok=False, move_backward_ok=False
-                ))
-                self._current_wps.append(
-                    None
-                )
-                self._current_wps.append((
-                    (0,0),
-                    GATE_UP,
-                    1,
-                    True
-                ))
-                # Reverse a little
-                self._current_wps.append((
-                    BACKWARD,
-                    GATE_UP,
-                    0.5,
-                    None
-                ))
+                # Open gate, go to block
+                self._current_srts.append(Subroutine([
+                    (
+                        (0,0),
+                        GATE_UP,
+                        0.01,
+                        None
+                    ),
+                    Waypoint(
+                        target_pos=b_c, pos_tol=5, robot_offset=SENSOR_OFFSET_NO_DETECT,
+                        orient_backward_ok=False, move_backward_ok=False
+                    )
+                ], just_once = (True, False)))
+                # Read background lighting conds, then go closer
+                self._current_srts.append(Subroutine([
+                    (
+                        (0,0),
+                        GATE_UP,
+                        0.01,
+                        True
+                    ),
+                    Waypoint(
+                        target_pos=b_c, pos_tol=5, robot_offset=SENSOR_OFFSET_DETECT,
+                        orient_backward_ok=False, move_backward_ok=False
+                    )
+                ], just_once = (True, False)))
+                # Read block lighting conds, then reverse a bit
+                self._current_srts.append(Subroutine([
+                    (
+                        BACKWARD,
+                        GATE_UP,
+                        0.5,
+                        True
+                    )
+                ], just_once=tuple([True])))
                 # Go to the block
-                self._current_wps.append(block_wp)
-                self._current_wps.append((
-                    FORWARD,
-                    GATE_UP,
-                    0.5,
-                    None
-                ))
-                self._current_wps.append((
-                    (0,0),
-                    GATE_DOWN,
-                    1,
-                    None
-                ))
-                self._current_wps.append((
-                    BACKWARD,
-                    GATE_DOWN,
-                    1,
-                    None
-                ))
+                self._current_srts.append(Subroutine([
+                    Waypoint(
+                        target_pos=b_c, pos_tol=3, orient_tol=3, 
+                        robot_offset=GATE_OFFSET,
+                        orient_backward_ok=False, move_backward_ok=False
+                    )
+                ]))
+                # Go forward a tad more (just in case),
+                # drop the gate,
+                # reverse out a bit
+                self._current_srts.append(Subroutine([
+                    (
+                        FORWARD,
+                        GATE_UP,
+                        0.25,
+                        False
+                    ),
+                    (
+                        (0,0),
+                        GATE_DOWN,
+                        0.5,
+                        False
+                    ),
+                    (
+                        BACKWARD,
+                        GATE_DOWN,
+                        0.5,
+                        False
+                    )
+                ], just_once = (True, True, True)))
         return True
 
     def run(self) -> "tuple[np.ndarray, bool]":
@@ -821,22 +826,22 @@ class Navigator:
         cv2.circle(self._frame, np.int0(self._front), 4, (255,255,0), -1)
         cv2.circle(self._frame, np.int0(get_CofR(self._centre, self._front)), 4, (255,255,0), -1)
         cv2.drawMarker(self._frame, np.int0(self._not_stuck_pos), (0,0,255), cv2.MARKER_CROSS, 20, 2)
-        if len(self._current_wps) > 0 and self._wp_counter < len(self._current_wps):
-            self._draw_wp(self._current_wps[self._wp_counter])
+        if len(self._current_srts) > 0 and self._srt_counter < len(self._current_srts):
+            self._draw_srt(self._current_srts[self._srt_counter])
         
         # Skip this frame if state update failed
         if not ok: return self._frame, False
-        self._wps_up_to_date = True # If we got here, the waypoints must be ok.
+        self._srts_up_to_date = True # If we got here, the waypoints must be ok.
 
-        if not self._run_wps():
-            # reached end of wps
+        if not self._run_srts():
+            # reached end of srts
             self._got_block = not self._got_block
-            self._wps_up_to_date = False
-            self._wps_up_to_date = self._update_state(reuse_frame=True) # Get next waypoints
-            # If waypoints couldn't be calculated, wait until next frame
-            if not self._wps_up_to_date: return self._frame, False 
-            # New waypoints found, so execute the next one.
-            self._run_wps()
+            self._srts_up_to_date = False
+            self._srts_up_to_date = self._update_state(reuse_frame=True) # Get next waypoints
+            # If srts couldn't be calculated, wait until next frame
+            if not self._srts_up_to_date: return self._frame, False 
+            # New srts found, so execute the next one.
+            self._run_srts()
         return self._frame, True
 
 def _test_navigator():
@@ -853,7 +858,7 @@ def _test_navigator():
             write_count += 1
         if DEBUG_WAYPOINTS:
             if key == ord('n'):
-                nav._wp_counter += 1
+                nav._srt_counter += 1
             elif key == ord('b'):
                 nav._block_blue = True
             elif key == ord('r'):
@@ -862,5 +867,5 @@ def _test_navigator():
 
 
 if __name__ == "__main__":
-    _test_calibrate()
-    # _test_navigator()
+    # _test_calibrate()
+    _test_navigator()

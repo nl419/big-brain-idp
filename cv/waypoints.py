@@ -5,6 +5,8 @@ from find_coords import untransform_board
 import cv2
 
 _DEBUG = __name__ == "__main__"
+MAX_COMMAND_NUM = 2
+
 
 class Waypoint:
     _target_pos: np.ndarray
@@ -385,9 +387,14 @@ def predict_centre_front(centre: np.ndarray, front: np.ndarray,\
 class Subroutine:
     _actions: list or tuple
     _skip_checks: bool
-    def __init__(self, actions: list or tuple, skip_checks: bool = True) -> None:
+    _just_once: "tuple[bool]"
+    _has_run: "list[bool]"
+
+    def __init__(self, actions: list or tuple, skip_checks: bool = True, just_once: "tuple[bool]" = None) -> None:
         self._actions = actions
         self._skip_checks = skip_checks
+        self._just_once = just_once if just_once is not None else tuple([False] * len(actions))
+        self._has_run = [False] * len(actions)
 
     def draw(self, image: np.ndarray, colour: tuple = (0,255,0)):
         # Draw all the waypoints on
@@ -402,8 +409,12 @@ class Subroutine:
         f_new = front
         done = False
         force_get_next = False
-        for a in self._actions:
+        for i,a in enumerate(self._actions):
+            # Don't send too many commands at once
+            if len(commands) >= MAX_COMMAND_NUM: break
             while not done:
+                if self._has_run[i] and self._just_once[i]:
+                    break # Just get the next command
                 if type(a) is Waypoint:
                     # Try to get a rotation
                     command, duration = a.get_command(c_new, f_new, True)
@@ -415,8 +426,10 @@ class Subroutine:
                     servo_pos, check_colour = None, False
                 else: # 'a' is tuple of hardcoded commands
                     command, servo_pos, duration, check_colour = a
+                    self._has_run[i] = True
                     force_get_next = True
                 if command is None:
+                    self._has_run[i] = True
                     break # Waypoint complete
                 commands.append(command)
                 durations.append(duration)
@@ -430,7 +443,7 @@ class Subroutine:
                     break # Hardcoded command complete
             else:
                 break # Done was true, so stop getting commands
-            
+        
         return commands, servo_poss, durations, colour_threshs
 
 # _T means transformed coordinates (relative to the yellow barriers)
@@ -686,6 +699,8 @@ def _test_subroutine():
     target_pos = np.array((100,100))
     offset = COFR_OFFSET
     orient = np.array((1,0))
+    srt: Subroutine
+    MAX_COMMAND_NUM = 2
 
     def click_event(event, x, y, flags, params):
         nonlocal target_pos, offset
@@ -693,13 +708,11 @@ def _test_subroutine():
         if event == cv2.EVENT_LBUTTONDOWN:
             target_pos = np.array((x,y))
             offset = COFR_OFFSET
+            reset_srt()
             redraw()
 
-    def redraw():
-        nonlocal target_pos, centre, front, c_new, f_new, offset, orient
-        image = original.copy()
-        cv2.drawMarker(image, np.int0(centre), (255,0,0), cv2.MARKER_CROSS, 30, 2)
-        cv2.drawMarker(image, np.int0(front), (255,0,0), cv2.MARKER_CROSS, 30, 2)
+    def reset_srt():
+        nonlocal srt, target_pos, orient, offset
         srt = Subroutine([
             Waypoint(target_pos=target_pos, target_orient=orient, 
                   pos_tol=20, orient_tol=5, robot_offset=offset,
@@ -710,12 +723,20 @@ def _test_subroutine():
                 1/CORNER_SPEED,
                 False
             )
-        ])
+        ], just_once=(True, True))
+
+
+    def redraw():
+        nonlocal target_pos, centre, front, c_new, f_new, offset, orient
+        image = original.copy()
+        cv2.drawMarker(image, np.int0(centre), (255,0,0), cv2.MARKER_CROSS, 30, 2)
+        cv2.drawMarker(image, np.int0(front), (255,0,0), cv2.MARKER_CROSS, 30, 2)
         commands, _, durations, _ = srt.get_command_list(centre, front)
         print(f"commands: {commands}")
         print(f"durations: {durations}")
         c_new, f_new = centre, front
-        for command, duration in zip(commands, durations):
+        for i, (command, duration) in enumerate(zip(commands, durations)):
+            if i >= MAX_COMMAND_NUM: break
             c_new, f_new = predict_centre_front(c_new, f_new, command, duration)
         print(c_new, f_new)
         bbox = get_bbox_from_centre_front(c_new, f_new)
@@ -725,6 +746,7 @@ def _test_subroutine():
     
     cv2.namedWindow("image")
     cv2.setMouseCallback('image', click_event)
+    reset_srt()
     while True:
         redraw()
         key = cv2.waitKey(0) & 0xFF
@@ -737,19 +759,23 @@ def _test_subroutine():
             target_pos = untransform_board(shift, invmat, BLUE_BARRIER_T)
             offset = CORNER_LEFT_OFFSET
             orient = np.array((-1, 0))
+            reset_srt()
         elif key == ord('o'):
             target_pos = untransform_board(shift, invmat, BLUE_BARRIER_T)
             offset = CORNER_RIGHT_OFFSET
             orient = np.array((0, -1))
+            reset_srt()
         elif key == ord('k'):
             target_pos = untransform_board(shift, invmat, RED_BARRIER_T)
             offset = CORNER_LEFT_OFFSET
             orient = np.array((1, 0))
+            reset_srt()
         elif key == ord('l'):
             target_pos = untransform_board(shift, invmat, RED_BARRIER_T)
             offset = CORNER_RIGHT_OFFSET
             orient = np.array((0, 1))
+            reset_srt()
 if __name__ == "__main__":
-    # _test_waypoint()
+    _test_waypoint()
     # _test_waypoint_list()
-    _test_subroutine()
+    # _test_subroutine()
