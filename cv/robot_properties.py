@@ -24,6 +24,8 @@ FORWARD_FINE = np.array((-150,-150))
 BACKWARD_FINE = -FORWARD_FINE
 LEFT_FINE = np.array((100,-100))
 RIGHT_FINE = -LEFT_FINE
+MOVEMENT_SPEED_FINE = 50     # Forward/Backward movement speed in px/s on unscaled image
+ROTATION_SPEED_FINE = 2 * np.pi / 15      # Radians per second
 
 #------------------
 
