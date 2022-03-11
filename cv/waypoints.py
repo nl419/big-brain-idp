@@ -512,14 +512,14 @@ HOME_T = np.array((-0.02170, -1.78574))
 
 ## Intermediate waypoints
 # Near corners on pickup / dropoff side
-BLUE_POINT_PICKUP_T = np.array((-1.83500, 0.20022)) 
-BLUE_POINT_DROPOFF_T = np.array((-1.83830, -0.23002))
+BLUE_POINT_PICKUP_T = np.array((-1.61676, 0.34402)) 
+BLUE_POINT_DROPOFF_T = np.array((-1.58184, -0.26998))
 # Near dropoff boxes
 BLUE_POINT_BOX1_T = np.array((-0.82942, -0.98781))
 BLUE_POINT_BOX2_T = np.array((-0.84395, -0.51035))
 
-RED_POINT_PICKUP_T = np.array((1.89850, 0.24917))
-RED_POINT_DROPOFF_T = np.array((1.88261, -0.25010))
+RED_POINT_PICKUP_T = np.array((1.70740, 0.39640))
+RED_POINT_DROPOFF_T = np.array((1.70680, -0.31770))
 RED_POINT_BOX1_T = np.array((0.79716, -1.04265))
 RED_POINT_BOX2_T = np.array((0.80650, -0.55608))
 

@@ -18,7 +18,7 @@ from robot_properties import *
 ip = "http://192.168.137.45"
 
 SEND_COMMANDS = True # whether to attempt to send commands to the ip address
-MIN_COMMAND_INTERVAL = 1500 # in ms
+MIN_COMMAND_INTERVAL = 1000 # in ms
 DEBUG_WAYPOINTS = True
 IMPROVE_DROPOFF = True
 READ_SENSOR = True
@@ -723,8 +723,8 @@ class Navigator:
                     self._current_srts.append(Subroutine([
                         Waypoint(
                             target_pos=coord, target_orient=b_c-coord,
-                            pos_tol=3, orient_tol=3,
-                            robot_offset=GATE_OFFSET, move_backward_ok=False
+                            pos_tol=10, orient_tol=5,
+                            robot_offset=GATE_OFFSET, move_backward_ok=True
                         )
                     ]))
 
@@ -870,5 +870,5 @@ def _test_navigator():
 
 
 if __name__ == "__main__":
-    _test_calibrate()
-    # _test_navigator()
+    # _test_calibrate()
+    _test_navigator()

@@ -54,7 +54,7 @@ CORNER_RIGHT = np.array((255,100))
 
 MOVEMENT_SPEED_FINE = 25     # Forward/Backward movement speed in px/s on unscaled image
 ROTATION_SPEED_FINE = 2 * np.pi / 6.85      # Radians per second
-MOVEMENT_SPEED = 66     # Forward/Backward movement speed in px/s on unscaled image
+MOVEMENT_SPEED = 70     # Forward/Backward movement speed in px/s on unscaled image
 ROTATION_SPEED = 2 * np.pi / 2.65      # Radians per second
 CORNER_SPEED = 1 / 2.1 # Corners per second
 
@@ -67,7 +67,7 @@ CORNER_RIGHT_OFFSET = np.array([-1.0455142,  3.9454316]) #
 
 GATE_UP = 135
 GATE_DOWN = 45
-GATE_OFFSET = np.array((1.5,0))
+GATE_OFFSET = np.array((1.2,0))
 MIDDLE_OFFSET = np.array((0,0))
 
 SENSOR_OFFSET_DETECT = np.array((2.5,0.7))
