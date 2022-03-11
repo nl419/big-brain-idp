@@ -202,13 +202,13 @@ def dropoff_boxes(img: np.ndarray, shift=None, invmat=None, improve_dropoff=True
         cv2.waitKey(0)
         cv2.destroyWindow("mask")
 
-    mask = cv2.erode(mask, (8,8), iterations=1)
-    mask = cv2.dilate(mask, (8,8), iterations=1)
+    # mask = cv2.erode(mask, (8,8), iterations=1)
+    # mask = cv2.dilate(mask, (8,8), iterations=1)
 
-    if _DEBUG:
-        cv2.imshow("after opening", mask)
-        cv2.waitKey(0)
-        cv2.destroyWindow("after opening")
+    # if _DEBUG:
+    #     cv2.imshow("after opening", mask)
+    #     cv2.waitKey(0)
+    #     cv2.destroyWindow("after opening")
 
     # Filter out contours of wrong size
     # Calculate centres for the remaining contours
@@ -404,7 +404,7 @@ def _test_dropoff_boxes():
     from unfisheye import undistort
 
     # image = cv2.imread('new_board/1.jpg')
-    image = cv2.imread('dots/smol1.jpg')
+    image = cv2.imread('dots/smol4.jpg')
     # image = cv2.imread('dropoff-boxes/5.jpg')
     # image = cv2.imread('checkerboard2/3.jpg')
 
@@ -420,5 +420,5 @@ def _test_dropoff_boxes():
 
 if __name__=="__main__":
     # _pick_points()
-    _pick_points_normalised()
-    # _test_dropoff_boxes()
+    # _pick_points_normalised()
+    _test_dropoff_boxes()

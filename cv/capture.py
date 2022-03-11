@@ -7,7 +7,7 @@ folder = "dots"
 print ("starting grab")
 cap = cv2.VideoCapture('http://localhost:8081/stream/video.mjpeg')
 prefix = "smol"
-counter = 1
+counter = 3
 while True:
     ret, frame = cap.read()
     cv2.imshow('Video', frame)

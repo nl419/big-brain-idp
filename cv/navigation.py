@@ -15,12 +15,12 @@ from find_dots import *
 import time
 import math
 from robot_properties import *
-ip = "http://192.168.137.37"
+ip = "http://192.168.137.45"
 
 SEND_COMMANDS = True # whether to attempt to send commands to the ip address
 MIN_COMMAND_INTERVAL = 1500 # in ms
 DEBUG_WAYPOINTS = True
-IMPROVE_DROPOFF = False
+IMPROVE_DROPOFF = True
 READ_SENSOR = True
 CHECK_STUCK = False
 
@@ -43,8 +43,10 @@ STUCK_COMMANDS = (
 )
 
 CALIBRATION_COMMANDS = (
-    (CORNER_RIGHT, 1/CORNER_SPEED),
-    (FORWARD, 2)
+    (RIGHT_FINE, 1),
+    # (CORNER_LEFT, 1/CORNER_SPEED),
+    # (CORNER_RIGHT, 1/CORNER_SPEED),
+    (FORWARD_FINE, 1)
 )
 
 # How to parse the return from the Arduino
