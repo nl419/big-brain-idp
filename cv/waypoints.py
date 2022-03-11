@@ -159,7 +159,7 @@ class Waypoint:
         t = self._target_pos
         return np.linalg.norm(t - o)
 
-    def get_command(self, centre: np.ndarray, front: np.ndarray):
+    def get_command(self, centre: np.ndarray, front: np.ndarray, rotation_only: bool = False):
         """Get a motor command pair and duration in order to execute this waypoint
 
         Parameters
@@ -191,10 +191,15 @@ class Waypoint:
                 rot = self._get_rotation_align_CofR(centre, front)
                 # Tolerance for the intermediate rotation is fixed at 5 deg
                 if abs(rot) > np.radians(3):
+                    # Reverse a bit if too close
+                    if dist < self._near_tol:
+                        if rotation_only: return None, 0
+                        return BACKWARD, self._near_tol / MOVEMENT_SPEED
                     command = RIGHT if rot > 0 else LEFT
                     return command, abs(rot) / ROTATION_SPEED
+                if rotation_only: return None, 0
 
-                # If we got here, then no reversing / turning was needed.
+                # If we got here, then no turning was needed.
                 # Should now just head to the point.
                 trans = self._get_translation_align(centre, front)
                 command = FORWARD if trans > 0 else BACKWARD
@@ -202,12 +207,6 @@ class Waypoint:
 
             # Make sure the robot is facing the right way
             rot = self._get_rotation_align_target(centre, front)
-            # If the rotation required is large, and we're near the target
-            abs_dist = self._get_abs_distance(centre, front)
-            if rot > np.radians(30) and abs_dist > self._pos_tol and abs_dist < self._near_tol:
-                # Reverse a little
-                return BACKWARD, self._near_tol / MOVEMENT_SPEED
-
             if abs(rot) > self._orient_tol:
                 command = RIGHT if rot > 0 else LEFT
                 return command, abs(rot) / ROTATION_SPEED
@@ -225,6 +224,7 @@ class Waypoint:
         # If near, but not quite there, reverse a little
         if abs_dist < self._near_tol and abs(rot) > np.radians(30):
             # Reverse a little
+            if rotation_only: return None, 0
             return BACKWARD, self._near_tol / MOVEMENT_SPEED
 
         # Rotate first, then move.
@@ -232,6 +232,7 @@ class Waypoint:
             command = RIGHT if rot > 0 else LEFT
             return command, abs(rot) / ROTATION_SPEED
         if abs(trans) > self._pos_tol:
+            if rotation_only: return None, 0
             command = FORWARD if trans > 0 else BACKWARD
             return command, abs(trans) / MOVEMENT_SPEED
 
@@ -365,32 +366,47 @@ def predict_centre_front(centre: np.ndarray, front: np.ndarray,\
     else: return centre, front
 
 
+
 # Generalises the idea of a list of actions to carry out
 # Returns all the commands to be run at once.
 class Subroutine:
-    def __init__(self) -> None:
-        # Grab a list of things to run
-        # Store them
-        pass
+    _actions: list or tuple
+    _skip_checks: bool
+    def __init__(self, actions: list or tuple, skip_checks: bool = True) -> None:
+        self._actions = actions
+        self._skip_checks = skip_checks
 
-    def _draw(self):
+    def draw(self, image: np.ndarray, colour: tuple = (0,255,0)):
         # Draw all the waypoints on
-        pass
+        for a in self._actions:
+            if type(a) is Waypoint:
+                a.draw(image, colour)
 
-    def run(self):
+    def get_command_list(self, centre, front, colour_thresh = None):
         # Return all the commands to be sent
-        pass
-
-# Generalises multiple subroutines being grouped together
-# Runs each of the routines one by one.
-class Routine:
-    def __init__(self) -> None:
-        pass
+        commands, durations, servo_poss, colour_threshs = [], [], [], []
+        c_new = centre
+        f_new = front
+        for a in self._actions:
+            if type(a) is Waypoint:
+                command, duration = a.get_command(c_new, f_new)
+                servo_pos, check_colour = None, False
+            else: # 'a' is tuple of hardcoded commands
+                command, duration, servo_pos, check_colour = a
+            if command is not None:
+                commands.append(command)
+                durations.append(durations)
+                servo_poss.append(servo_pos)
+                colour_threshs.append(colour_thresh if check_colour else -1)
+                if not self._skip_checks:
+                    break
+                c_new, f_new = predict_centre_front(c_new, f_new, command, duration)
+        return commands, servo_poss, durations, colour_threshs
 
 # _T means transformed coordinates (relative to the yellow barriers)
 
-BLUE_BOUNDARY_T = np.array((-1.57657, 0.00544))
-RED_BOUNDARY_T = np.array((1.63555, -0.00785))
+BLUE_BARRIER_T = np.array((-1.57657, 0.00544))
+RED_BARRIER_T = np.array((1.63555, -0.00785))
 
 BLUE_CORNER_T = np.array((-1.90484, 0)) # 0.02536
 RED_CORNER_T = np.array((1.90484, 0)) # -0.00796 2.25079
@@ -515,19 +531,19 @@ def _test_waypoint():
             break
         # Testing cornering
         elif key == ord('i'):
-            target_pos = untransform_board(shift, invmat, BLUE_BOUNDARY_T)
+            target_pos = untransform_board(shift, invmat, BLUE_BARRIER_T)
             offset = CORNER_LEFT_OFFSET
             orient = np.array((-1, 0))
         elif key == ord('o'):
-            target_pos = untransform_board(shift, invmat, BLUE_BOUNDARY_T)
+            target_pos = untransform_board(shift, invmat, BLUE_BARRIER_T)
             offset = CORNER_RIGHT_OFFSET
             orient = np.array((0, -1))
         elif key == ord('k'):
-            target_pos = untransform_board(shift, invmat, RED_BOUNDARY_T)
+            target_pos = untransform_board(shift, invmat, RED_BARRIER_T)
             offset = CORNER_LEFT_OFFSET
             orient = np.array((1, 0))
         elif key == ord('l'):
-            target_pos = untransform_board(shift, invmat, RED_BOUNDARY_T)
+            target_pos = untransform_board(shift, invmat, RED_BARRIER_T)
             offset = CORNER_RIGHT_OFFSET
             orient = np.array((0, 1))
 

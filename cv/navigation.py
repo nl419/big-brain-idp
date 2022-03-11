@@ -226,7 +226,7 @@ class Navigator:
     _got_block: bool = False
     _block_blue: bool = False
     _last_reading: int = 0
-    _wps_up_to_date: bool = False
+    _srts_up_to_date: bool = False
 
     # Robot locations
     _centre: np.ndarray = np.array((100,100)) # Dummy initial values
@@ -244,23 +244,23 @@ class Navigator:
     _reds: "tuple[np.ndarray]"
 
     # First box = 0, second box = 1, second box reversed = 2
-    _blue_dropoff_wps: "tuple[tuple[Waypoint or tuple]]"
-    _red_dropoff_wps: "tuple[tuple[Waypoint or tuple]]"
+    _blue_dropoff_srts: "tuple[tuple[Subroutine]]"
+    _red_dropoff_srts: "tuple[tuple[Subroutine]]"
 
     _blue_count: int = 0
     _red_count: int = 0
 
     # Towards pickup = 0, Towards dropoff = 1
-    _blue_corner_wps: "tuple[tuple[Waypoint]]"
-    _red_corner_wps: "tuple[tuple[Waypoint]]"
+    _blue_corner_srts: "tuple[tuple[Subroutine]]"
+    _red_corner_srts: "tuple[tuple[Subroutine]]"
 
     # Generated automatically on state change
-    _current_wps: "list[Waypoint or tuple]" = []
-    _wp_counter: int = 0
+    _current_srts: "list[Subroutine]" = []
+    _srt_counter: int = 0
 
     # When placing the last block, place it backwards to the usual orientation
     # so that then you can just go straight home, without knocking the blocks
-    _home_wp: "Waypoint"
+    _home_srt: "Subroutine"
 
     # The string that was returned by the Arduino
     _ret_string: str = ""
@@ -272,191 +272,243 @@ class Navigator:
         self._shift, self._invmat, self._mat = get_shift_invmat_mat(frame)
         self._blues, self._reds = dropoff_boxes(frame, self._shift, self._invmat, IMPROVE_DROPOFF)
 
-        self._home_wp = Waypoint(target_pos=untransform_board(self._shift, self._invmat, HOME_T), 
-            target_orient=untransform_board(self._shift, self._invmat, np.array((0,0))) - untransform_board(self._shift, self._invmat, HOME_T)
-        )
-        self._blue_corner_wps = (
+        self._home_srt = Subroutine([
+            Waypoint(target_pos=untransform_board(self._shift, self._invmat, HOME_T), 
+                target_orient=untransform_board(self._shift, self._invmat, np.array((0,0))) - untransform_board(self._shift, self._invmat, HOME_T)
+            )
+        ])
+        self._blue_corner_srts = (
             (
-                Waypoint(
-                    target_pos=untransform_board(self._shift, self._invmat, BLUE_CORNER_TS[0]),
-                    target_orient=untransform_board(self._shift, self._invmat, BLUE_CORNER_TS[1]) - \
-                    untransform_board(self._shift, self._invmat, BLUE_CORNER_TS[0]),
-                    robot_offset=COFR_OFFSET, pos_tol=40, move_backward_ok=False
-                ),
-                Waypoint(
-                    target_pos=untransform_board(self._shift, self._invmat, BLUE_CORNER_TS[1]),
-                    robot_offset=COFR_OFFSET, pos_tol=20
-                ),
-                Waypoint(
-                    target_pos=untransform_board(self._shift, self._invmat, BLUE_CORNER_TS[2]),
-                    robot_offset=MIDDLE_OFFSET, pos_tol=20
-                ),
-                Waypoint(
-                    target_pos=untransform_board(self._shift, self._invmat, BLUE_CORNER_TS[3]),
-                    robot_offset=COFR_OFFSET, pos_tol=40
-                )
+                Subroutine([
+                    Waypoint(
+                        target_pos=untransform_board(self._shift, self._invmat, BLUE_POINT_DROPOFF_T),
+                        pos_tol=40, move_backward_ok=False
+                    )
+                ]),
+                Subroutine([
+                    Waypoint(
+                        target_pos=untransform_board(self._shift, self._invmat, BLUE_BARRIER_T),
+                        target_orient=untransform_board(self._shift, self._invmat, BLUE_BARRIER_T + np.array((-1,1))) - \
+                        untransform_board(self._shift, self._invmat, BLUE_BARRIER_T),
+                        robot_offset=CORNER_LEFT_OFFSET, pos_tol=20, move_backward_ok=False
+                    ),
+                    (
+                        CORNER_LEFT,
+                        GATE_UP,
+                        1/CORNER_SPEED,
+                        False
+                    )
+                ]),
+                Subroutine([
+                    Waypoint(
+                        target_pos=untransform_board(self._shift, self._invmat, BLUE_POINT_PICKUP_T),
+                        pos_tol=40, move_backward_ok=False
+                    )
+                ])
             ),
             (
-                Waypoint(
-                    target_pos=untransform_board(self._shift, self._invmat, BLUE_CORNER_TS[3]),
-                    target_orient=untransform_board(self._shift, self._invmat, BLUE_CORNER_TS[2]) - \
-                    untransform_board(self._shift, self._invmat, BLUE_CORNER_TS[3]),
-                    robot_offset=COFR_OFFSET, pos_tol=40, move_backward_ok=False
-                ),
-                Waypoint(
-                    target_pos=untransform_board(self._shift, self._invmat, BLUE_CORNER_TS[2]),
-                    robot_offset=COFR_OFFSET, pos_tol=20
-                ),
-                Waypoint(
-                    target_pos=untransform_board(self._shift, self._invmat, BLUE_CORNER_TS[1]),
-                    robot_offset=MIDDLE_OFFSET, pos_tol=20
-                ),
-                Waypoint(
-                    target_pos=untransform_board(self._shift, self._invmat, BLUE_CORNER_TS[0]),
-                    robot_offset=COFR_OFFSET, pos_tol=40
-                )
+                Subroutine([
+                    Waypoint(
+                        target_pos=untransform_board(self._shift, self._invmat, BLUE_POINT_PICKUP_T),
+                        pos_tol=40, move_backward_ok=False
+                    )
+                ]),
+                Subroutine([
+                    Waypoint(
+                        target_pos=untransform_board(self._shift, self._invmat, BLUE_BARRIER_T),
+                        target_orient=untransform_board(self._shift, self._invmat, BLUE_BARRIER_T + np.array((-1,-1))) - \
+                        untransform_board(self._shift, self._invmat, BLUE_BARRIER_T),
+                        robot_offset=CORNER_RIGHT_OFFSET, pos_tol=20, move_backward_ok=False
+                    ),
+                    (
+                        CORNER_RIGHT,
+                        GATE_DOWN,
+                        1/CORNER_SPEED,
+                        False
+                    )
+                ]),
+                Subroutine([
+                    Waypoint(
+                        target_pos=untransform_board(self._shift, self._invmat, BLUE_POINT_DROPOFF_T),
+                        pos_tol=40, move_backward_ok=False
+                    )
+                ])
             )
         )
 
-        self._red_corner_wps = (
+        self._red_corner_srts = (
             (
-                Waypoint(
-                    target_pos=untransform_board(self._shift, self._invmat, RED_CORNER_TS[0]),
-                    target_orient=untransform_board(self._shift, self._invmat, RED_CORNER_TS[1]) - \
-                    untransform_board(self._shift, self._invmat, RED_CORNER_TS[0]),
-                    robot_offset=COFR_OFFSET, pos_tol=40, move_backward_ok=False
-                ),
-                Waypoint(
-                    target_pos=untransform_board(self._shift, self._invmat, RED_CORNER_TS[1]),
-                    robot_offset=COFR_OFFSET, pos_tol=20
-                ),
-                Waypoint(
-                    target_pos=untransform_board(self._shift, self._invmat, RED_CORNER_TS[2]),
-                    robot_offset=MIDDLE_OFFSET, pos_tol=20
-                ),
-                Waypoint(
-                    target_pos=untransform_board(self._shift, self._invmat, RED_CORNER_TS[3]),
-                    robot_offset=COFR_OFFSET, pos_tol=40
-                )
+                Subroutine([
+                    Waypoint(
+                        target_pos=untransform_board(self._shift, self._invmat, RED_POINT_DROPOFF_T),
+                        pos_tol=40, move_backward_ok=False
+                    )
+                ]),
+                Subroutine([
+                    Waypoint(
+                        target_pos=untransform_board(self._shift, self._invmat, RED_BARRIER_T),
+                        target_orient=untransform_board(self._shift, self._invmat, RED_BARRIER_T + np.array((1,1))) - \
+                        untransform_board(self._shift, self._invmat, RED_BARRIER_T),
+                        robot_offset=CORNER_LEFT_OFFSET, pos_tol=20, move_backward_ok=False
+                    ),
+                    (
+                        CORNER_RIGHT,
+                        GATE_UP,
+                        1/CORNER_SPEED,
+                        False
+                    )
+                ]),
+                Subroutine([
+                    Waypoint(
+                        target_pos=untransform_board(self._shift, self._invmat, RED_POINT_PICKUP_T),
+                        pos_tol=40, move_backward_ok=False
+                    )
+                ])
             ),
             (
-                Waypoint(
-                    target_pos=untransform_board(self._shift, self._invmat, RED_CORNER_TS[3]),
-                    target_orient=untransform_board(self._shift, self._invmat, RED_CORNER_TS[2]) - \
-                    untransform_board(self._shift, self._invmat, RED_CORNER_TS[3]),
-                    robot_offset=COFR_OFFSET, pos_tol=40, move_backward_ok=False
-                ),
-                Waypoint(
-                    target_pos=untransform_board(self._shift, self._invmat, RED_CORNER_TS[2]),
-                    robot_offset=COFR_OFFSET, pos_tol=20
-                ),
-                Waypoint(
-                    target_pos=untransform_board(self._shift, self._invmat, RED_CORNER_TS[1]),
-                    robot_offset=MIDDLE_OFFSET, pos_tol=20
-                ),
-                Waypoint(
-                    target_pos=untransform_board(self._shift, self._invmat, RED_CORNER_TS[0]),
-                    robot_offset=COFR_OFFSET, pos_tol=40
-                )
+                Subroutine([
+                    Waypoint(
+                        target_pos=untransform_board(self._shift, self._invmat, RED_POINT_PICKUP_T),
+                        pos_tol=40, move_backward_ok=False
+                    )
+                ]),
+                Subroutine([
+                    Waypoint(
+                        target_pos=untransform_board(self._shift, self._invmat, RED_BARRIER_T),
+                        target_orient=untransform_board(self._shift, self._invmat, RED_BARRIER_T + np.array((1,-1))) - \
+                        untransform_board(self._shift, self._invmat, RED_BARRIER_T),
+                        robot_offset=CORNER_RIGHT_OFFSET, pos_tol=20, move_backward_ok=False
+                    ),
+                    (
+                        CORNER_LEFT,
+                        GATE_DOWN,
+                        1/CORNER_SPEED,
+                        False
+                    )
+                ]),
+                Subroutine([
+                    Waypoint(
+                        target_pos=untransform_board(self._shift, self._invmat, RED_POINT_DROPOFF_T),
+                        pos_tol=40, move_backward_ok=False
+                    )
+                ])
             )
         )
 
-        dropoff_sequence = \
-        [
+        dropoff_srt = \
+        Subroutine([
             (
                 (0,0),
                 GATE_UP,
-                -MIN_COMMAND_INTERVAL/1000, # In seconds
+                0.1, # In seconds
                 None 
             ),
             (
                 BACKWARD,
                 GATE_UP,
-                1,
+                0.5,
                 None
+            )
+        ])
+
+        b_d_srts = [
+            (
+                Subroutine([
+                    Waypoint(
+                        target_pos=untransform_board(self._shift, self._invmat, BLUE_POINT_BOX1_T),
+                        target_orient=self._blues[0] - untransform_board(self._shift, self._invmat, BLUE_POINT_BOX1_T),
+                        pos_tol=10, orient_tol=2, robot_offset=GATE_OFFSET
+                    )
+                ]),
+                Subroutine([
+                    Waypoint(
+                        target_pos=self._blues[0],
+                        pos_tol=1, orient_tol=1, robot_offset=GATE_OFFSET
+                    )
+                ], False)
             ),
             (
-                (0,0),
-                GATE_DOWN,
-                -MIN_COMMAND_INTERVAL/1000,
-                None
+                Subroutine([
+                    Waypoint(
+                        target_pos=untransform_board(self._shift, self._invmat, BLUE_POINT_BOX2_T),
+                        target_orient=self._blues[1] - untransform_board(self._shift, self._invmat, BLUE_POINT_BOX1_T),
+                        pos_tol=10, orient_tol=2, robot_offset=GATE_OFFSET
+                    )
+                ]),
+                Subroutine([
+                    Waypoint(
+                        target_pos=self._blues[1],
+                        pos_tol=1, orient_tol=1, robot_offset=GATE_OFFSET
+                    )
+                ], False)
+            ),
+            (
+                Subroutine([
+                    Waypoint(
+                        target_pos=self._blues[1] + np.array((50,0)),
+                        target_orient=np.array((-100,0)),
+                        pos_tol=10, orient_tol=2, robot_offset=GATE_OFFSET
+                    )
+                ]),
+                Subroutine([
+                    Waypoint(
+                        target_pos=self._blues[1],
+                        pos_tol=1, orient_tol=1, robot_offset=GATE_OFFSET
+                    )
+                ], False)
             )
         ]
 
-        b_d_wps = [
-            [
-                Waypoint(
-                    target_pos=untransform_board(self._shift, self._invmat, BLUE_POINT_BOX1_T),
-                    target_orient=self._blues[0] - untransform_board(self._shift, self._invmat, BLUE_POINT_BOX1_T),
-                    pos_tol=10, orient_tol=2, robot_offset=GATE_OFFSET
-                ),
-                Waypoint(
-                    target_pos=self._blues[0],
-                    pos_tol=1, orient_tol=1, robot_offset=GATE_OFFSET
-                )
-            ],
-            [
-                Waypoint(
-                    target_pos=untransform_board(self._shift, self._invmat, BLUE_POINT_BOX2_T),
-                    target_orient=self._blues[1] - untransform_board(self._shift, self._invmat, BLUE_POINT_BOX2_T),
-                    pos_tol=10, orient_tol=2, robot_offset=GATE_OFFSET
-                ),
-                Waypoint(
-                    target_pos=self._blues[1],
-                    pos_tol=1, orient_tol=1, robot_offset=GATE_OFFSET
-                )
-            ],
-            [
-                Waypoint(
-                    target_pos=self._blues[1] + np.array((50,0)),
-                    target_orient=np.array((-100,0)),
-                    pos_tol=10, orient_tol=2, robot_offset=GATE_OFFSET
-                ),
-                Waypoint(
-                    target_pos=self._blues[1],
-                    pos_tol=1, orient_tol=1, robot_offset=GATE_OFFSET
-                )
-            ]
+        r_d_srts = [
+            (
+                Subroutine([
+                    Waypoint(
+                        target_pos=untransform_board(self._shift, self._invmat, RED_POINT_BOX1_T),
+                        target_orient=self._reds[0] - untransform_board(self._shift, self._invmat, RED_POINT_BOX1_T),
+                        pos_tol=10, orient_tol=2, robot_offset=GATE_OFFSET
+                    )
+                ]),
+                Subroutine([
+                    Waypoint(
+                        target_pos=self._reds[0],
+                        pos_tol=1, orient_tol=1, robot_offset=GATE_OFFSET
+                    )
+                ], False)
+            ),
+            (
+                Subroutine([
+                    Waypoint(
+                        target_pos=untransform_board(self._shift, self._invmat, RED_POINT_BOX2_T),
+                        target_orient=self._reds[1] - untransform_board(self._shift, self._invmat, RED_POINT_BOX1_T),
+                        pos_tol=10, orient_tol=2, robot_offset=GATE_OFFSET
+                    )
+                ]),
+                Subroutine([
+                    Waypoint(
+                        target_pos=self._reds[1],
+                        pos_tol=1, orient_tol=1, robot_offset=GATE_OFFSET
+                    )
+                ], False)
+            ),
+            (
+                Subroutine([
+                    Waypoint(
+                        target_pos=self._reds[1] + np.array((0,-50)),
+                        target_orient=np.array((0,50)),
+                        pos_tol=10, orient_tol=2, robot_offset=GATE_OFFSET
+                    )
+                ]),
+                Subroutine([
+                    Waypoint(
+                        target_pos=self._reds[1],
+                        pos_tol=1, orient_tol=1, robot_offset=GATE_OFFSET
+                    )
+                ], False)
+            )
         ]
 
-        r_d_wps = [
-            [
-                Waypoint(
-                    target_pos=untransform_board(self._shift, self._invmat, RED_POINT_BOX1_T),
-                    target_orient=self._reds[0] - untransform_board(self._shift, self._invmat, RED_POINT_BOX1_T),
-                    pos_tol=10, orient_tol=2, robot_offset=GATE_OFFSET
-                ),
-                Waypoint(
-                    target_pos=self._reds[0],
-                    pos_tol=1, orient_tol=1, robot_offset=GATE_OFFSET
-                )
-            ],
-            [
-                Waypoint(
-                    target_pos=untransform_board(self._shift, self._invmat, RED_POINT_BOX2_T),
-                    target_orient=self._reds[1] - untransform_board(self._shift, self._invmat, RED_POINT_BOX2_T),
-                    pos_tol=10, orient_tol=2, robot_offset=GATE_OFFSET
-                ),
-                Waypoint(
-                    target_pos=self._reds[1],
-                    pos_tol=1, orient_tol=1, robot_offset=GATE_OFFSET
-                )
-            ],
-            [
-                Waypoint(
-                    target_pos=self._reds[1] + np.array((0,-50)),
-                    target_orient=np.array((0,100)),
-                    pos_tol=10, orient_tol=2, robot_offset=GATE_OFFSET
-                ),
-                Waypoint(
-                    target_pos=self._reds[1],
-                    pos_tol=1, orient_tol=1, robot_offset=GATE_OFFSET
-                )
-            ]
-        ]
-
-        self._blue_dropoff_wps = [i + dropoff_sequence for i in b_d_wps]
-        self._red_dropoff_wps = [i + dropoff_sequence for i in r_d_wps]
+        self._blue_dropoff_srts = [list(i) + [dropoff_srt] for i in b_d_srts]
+        self._red_dropoff_srts = [list(i) + [dropoff_srt] for i in r_d_srts]
 
     def __repr__(self) -> str:
         result = (\
@@ -467,31 +519,27 @@ class Navigator:
       f"  stuck_since: {self._stuck_since}\n"
       f"  stuck_counter: {self._stuck_counter}\n"
       f"  not_stuck_thresh: {self._not_stuck_thresh}\n"
-      f"  wps_up_to_date: {self._wps_up_to_date}\n"
+      f"  srts_up_to_date: {self._srts_up_to_date}\n"
       f" =Coordinates=\n"
       f"  centre: {self._centre}\n"
       f"  front: {self._front}\n"
       f"  delta: {self._delta}\n"
       f"  centre: {self._centre}\n"
-      f" =Waypoints=\n"
-      f"  len(current_wps): {len(self._current_wps)}\n"
-      f"  wp_counter: {self._wp_counter}\n"
+      f" =Subroutines=\n"
+      f"  len(current_srts): {len(self._current_srts)}\n"
+      f"  srt_counter: {self._srt_counter}\n"
         )
         
-        for i,wp in enumerate(self._current_wps):
-            result += f"  {i:2}: {wp}\n"
+        for i,srt in enumerate(self._current_srts):
+            result += f"  {i:2}: {srt}\n"
         return result
 
-    def _draw_wp(self, wp):
-        if type(wp) is Waypoint:
-            wp.draw(self._frame)
+    def _draw_srt(self, srt: Subroutine):
+        srt.draw(self._frame)
 
-    def _run_wps(self):
-        # Returns False if the end of the wps were reached
+    def _run_srts(self):
+        # Returns False if the end of the srts were reached
         # Relies on self._centre, self._front being up to date
-        # If wps[i] isn't a Waypoint, should contain 
-        # (motor commands, gate_pos, duration: s)
-        # None triggers a block colour check
 
         # Check for stuck, 
         now = round(time.time() * 1000)
@@ -506,6 +554,7 @@ class Navigator:
         if self._delta > STATIONARY_THRESH or self._command_timeout > now:
             return True
 
+        # Get a commmand list
         while True:
             # Handle being stuck
             gate_pos = None
@@ -515,84 +564,77 @@ class Navigator:
                 command, duration = STUCK_COMMANDS[self._stuck_counter]
                 self._stuck_counter = (self._stuck_counter + 1) % len(STUCK_COMMANDS)
                 break
-            if self._wp_counter >= len(self._current_wps):
-                # Reached the end of the waypoints
-                self._wp_counter = 0
+            if self._srt_counter >= len(self._current_srts):
+                # Reached the end of the srts
+                self._srt_counter = 0
                 return False
-            wp = self._current_wps[self._wp_counter]
-            if type(wp) is Waypoint:
-                print("Executing waypoint")
-                command, duration = wp.get_command(self._centre, self._front)
-            elif wp is None:
-                # Check the colour of the block by sending a blank command
-                get_string = ip
-                if SEND_COMMANDS: self._ret_string = urllib.request.urlopen(get_string)
-                print("Reading sensor data...")
-                if READ_SENSOR and SEND_COMMANDS:
-                    for bytes in self._ret_string:
-                        line = bytes.decode("utf-8") 
-                        i = line.find(SENSOR_DATA_TRIGGER)
-                        if i != -1: break
-                    self._ret_string = line
-
-                    assert i != -1, "Sensor data was not found."
-                    i += len(SENSOR_DATA_TRIGGER)
-                    j = self._ret_string[i:].find(END_SENSOR_DATA_TRIGGER)
-                    assert j != -1, "End of sensor data was not found."
-                    data = int(self._ret_string[i:i+j])
-                else:
-                    data = 200 # dummy value
-                print(f"data {data}")
-                if self._last_reading == 0:
-                    print("Background levels measured.")
-                    self._last_reading = data
-                elif data - self._last_reading > SENSOR_DELTA_THRESH:
-                    print("Red block found.")
-                    self._block_blue = False
-                    self._last_reading = 0
-                else:
-                    print("Blue block found.")
-                    if not READ_SENSOR or not SEND_COMMANDS: print("OVERRIDE: not updating block colour.")
-                    else: self._block_blue = True
-                    self._last_reading = 0
-                # Don't send commands too quickly
-                time.sleep(MIN_COMMAND_INTERVAL / 1000)
-                # Stand still for 1 second.
-                command, duration = (0,0), 1
-                self._wp_counter += 1
+            srt: Subroutine = self._current_srts[self._srt_counter]
+            print("Executing subroutine")
+            commands, gate_poss, durations, colour_threshs = srt.get_command_list(self._centre, self._front, None if self._last_reading == 0 else self._last_reading + SENSOR_DELTA_THRESH)
+            if len(commands) == 0:
+                # Subroutine completed, get the next one
+                self._srt_counter += 1
             else:
-                print("Executing hardcoded command")
-                command, gate_pos, duration, shouldBlinkLED = wp
-                self._wp_counter += 1
-            if command is None:
-                # Waypoint completed, get the next one
-                self._wp_counter += 1
-            else:
-                # We have a valid command, send it.
+                # We have a valid command list, send it.
                 break
-        # Turn that into a getString
-        duration *= 1000 # Turn s into ms
-        if math.isnan(duration): 
-            # If nan, just give up, and pray the next frame is ok.
-            # This should never happen!
-            print("==============================")
-            print("DURATION WAS NAN, MUST FIX NOW")
-            print("==============================")
-            print(f"command: {command}")
-            print(repr(self))
-            time.sleep(5)
-            return True
-        duration = int(duration)
-        get_string = ip + "/TRIGGER/" + str(command[0]) + "/" + str(command[1]) + \
-                    "/" + (str(gate_pos) if gate_pos is not None else "") + "/" + str(duration) + "/"
-
-        if shouldBlinkLED is not None: get_string += (str(0) if self._block_blue else str(1)) + "/"
-        else: get_string += "/"
+        get_string = ip + "/TRIGGER/"
+        take_reading = False
+        for i, (command, gate_pos, duration, colour_thresh) in enumerate(zip(commands, gate_poss, durations, colour_threshs)):
+            # Don't send more than 2 commands at once
+            if i >= 2: break
+            # Turn that into a getString
+            duration *= 1000 # Turn s into ms
+            if math.isnan(duration): 
+                # If nan, just give up, and pray the next frame is ok.
+                # This should never happen!
+                print("==============================")
+                print("DURATION WAS NAN, MUST FIX NOW")
+                print("==============================")
+                print(f"command: {command}")
+                print(repr(self))
+                time.sleep(5)
+                return True
+            duration = int(duration)
+            get_string += str(command[0]) + "/" + str(command[1]) + \
+                        "/" + (str(gate_pos) if gate_pos is not None else "") + "/" + str(duration) + \
+                        "/" + str(colour_thresh) + "/"
+            if colour_thresh != -1: take_reading = True
 
         if SEND_COMMANDS: self._ret_string = urllib.request.urlopen(get_string)
         print(f"sending command {get_string}")
-        self._command_timeout = now + duration + MIN_COMMAND_INTERVAL
-        
+        self._command_timeout = now + sum(durations) * 1000 + MIN_COMMAND_INTERVAL
+        # Handle block colour detection
+        if take_reading:
+            print("Reading sensor data...")
+            if READ_SENSOR and SEND_COMMANDS:
+                for bytes in self._ret_string:
+                    line = bytes.decode("utf-8") 
+                    i = line.find(SENSOR_DATA_TRIGGER)
+                    if i != -1: break
+                self._ret_string = line
+
+                assert i != -1, "Sensor data was not found."
+                i += len(SENSOR_DATA_TRIGGER)
+                j = self._ret_string[i:].find(END_SENSOR_DATA_TRIGGER)
+                assert j != -1, "End of sensor data was not found."
+                data = int(self._ret_string[i:i+j])
+            else:
+                data = 200 # dummy value
+            print(f"data {data}")
+            if self._last_reading == 0:
+                print("Background levels measured.")
+                self._last_reading = data
+            elif data - self._last_reading > SENSOR_DELTA_THRESH:
+                print("Red block found.")
+                self._block_blue = False
+                self._last_reading = 0
+            else:
+                print("Blue block found.")
+                if not READ_SENSOR or not SEND_COMMANDS: print("OVERRIDE: not updating block colour.")
+                else: self._block_blue = True
+                self._last_reading = 0
+
+        # Handle stuck detection
         if not CHECK_STUCK: return True
 
         # Update not stuck threshold based on how much the robot should be moving

@@ -48,7 +48,7 @@ TRUE_FRONT_OFFSET = np.array([5.48090966, 0.25370332])
 CORNER_LEFT_OFFSET = np.array([-1.22412327, -3.50819671])
 CORNER_RIGHT_OFFSET = np.array([-1.23345301,  3.69989283])
 
-
+# Purely for debugging purposes
 _BOT_SIZE = 2
 OUTER_BBOX = np.array((
     (-_BOT_SIZE, -_BOT_SIZE),

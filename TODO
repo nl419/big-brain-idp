@@ -15,7 +15,7 @@ LAG COMPENSATION:
     as well as checking if it's stopped moving on the video feed.
 
 FASTER:
-Send a list of up to 10 commands at once
+Send 2 commands at once
     5 variables per command
         Left, Right, Servo, Duration, Blink colour
     Read 5 variables at a time,
@@ -38,45 +38,43 @@ Send a list of up to 10 commands at once
 
 List of waypoint groups:
 
-Corner: 16s
-    { 4.0s
-        Go to before corner wp
+Corner
+    { repeatedly
+        Turn to corner wp
+        Go to corner wp
     }
     { 3.0s
-        Go to 1st corner wp
-    }
-    { 2.0s
-        Go to 2nd corner wp
-        Turn to face next wp
-    }
-    { 3.0s
-        Go to after corner wp
+        Turn a corner
     }
 
-Pickup block 9.3s
-    { 5.0s
-        Approach block 8000ms
+Pickup block
+    { repeatedly
+        Turn to block
+        Go to block
     }
     { 0.2s
         Sense background, 0ms
         Move forward, 200ms
     }
-    { 1.1s
-        Sense block, 0ms (and light up LED by yourself, send it the threshold, not the colour to light up)
-        Move backward, 200ms (may have to pause longer for competition rules)
+    { 0.2s
+        Sense block, move backward, 200ms (and light up LED by yourself, send it the threshold, not the colour to light up)
+    }
+    { 1.0s
         Turn towards block 200ms
-        Go to block_wp 500ms
+        Move forward 800ms
+    }
+    { 0.7s
         Close gate 200ms
         Move backward, 500ms
     }
 
-Dropoff block 10s
-    { 3.0s
-        Go to before dropoff
-        Turn to face next wp
+Dropoff block
+    { repeatedly
+        Turn to before dropoff wp
+        Go to before dropoff wp
     }
-    { 3.0s
-        Accurately place the block
+    { repeatedly
+        Do dropoff waypoint, don't skip checks
     }
     { 1.0s
         Open gate, 500ms
