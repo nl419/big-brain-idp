@@ -9,9 +9,9 @@ from robot_properties import *
 _DEBUG = __name__ == "__main__"
 _DRAW_MASKS = True and _DEBUG
 
-def drawMarkers(img: np.ndarray, points: "list[int]", lineColour: "list[int]", removeParallax: bool = True):
+def drawMarkers(img: np.ndarray, points: "list[int]", lineColour: "list[int]", removeParallax: bool = True, drawForward: bool = True):
     """Draws markers on the image for a four point bounding box.
-    Also draws the forward-facing line. Removes effects of parallax
+    Draws the forward-facing line by default. Removes effects of parallax
     by default.
 
     Parameters
@@ -24,6 +24,8 @@ def drawMarkers(img: np.ndarray, points: "list[int]", lineColour: "list[int]", r
         Colour (B,G,R) of lines joining the vertices
     removeParallax : bool, optional
         Whether to remove parallax, default True
+    drawForward : bool, optional
+        Whether to draw the forward facing direction, default True
     Returns
     -------
     centre : np.ndarray 
@@ -45,10 +47,12 @@ def drawMarkers(img: np.ndarray, points: "list[int]", lineColour: "list[int]", r
             p1 = np.int0(p)
             p2 = np.int0(points[(j+1) % len(points)])
             cv2.line(img, p1, p2, lineColour, 3)
-
     # Find salient coordinates
     centre = np.mean(points, axis=0)
     top_midpoint = np.mean(points[0:2], axis=0)
+    if not drawForward: return centre, top_midpoint
+
+    # Draw forward direction
     marker_radius = 5
     cv2.circle(img, np.int0(centre), radius=marker_radius,
                color=(0, 0, 255), thickness=-1)
@@ -224,11 +228,17 @@ def untransform_coords(x: np.ndarray, centre: np.ndarray, front: np.ndarray):
     mat = np.array(((df[0], -df[1]), (df[1], df[0])))
     return np.matmul(mat, x) + centre
 
-def get_CofR(centre: np.ndarray, front: np.ndarray):
+def get_CofR(centre: np.ndarray, front: np.ndarray) -> np.ndarray:
     return untransform_coords(COFR_OFFSET, centre, front)
 
-def get_true_front(centre: np.ndarray, front:np.ndarray):
+def get_true_front(centre: np.ndarray, front: np.ndarray) -> np.ndarray:
     return untransform_coords(TRUE_FRONT_OFFSET, centre, front)
+
+def get_outer_bbox(centre: np.ndarray, front: np.ndarray) -> np.ndarray:
+    result = []
+    for t in OUTER_BBOX:
+        result.append(untransform_coords(t, centre, front))
+    return np.array(result)
 
 def _test_transform():
     x = np.array([1,0])
