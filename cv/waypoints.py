@@ -363,6 +363,19 @@ def predict_centre_front(centre: np.ndarray, front: np.ndarray,\
         f_new = np.matmul(mat, front - m) + m
         c_new = np.matmul(mat, centre - m) + m
         return c_new, f_new
+    elif (command == CORNER_LEFT).all() or (command == CORNER_RIGHT).all():
+        direction = 1 # +ve cw
+        if (command == CORNER_LEFT).all():
+            direction = -1
+        speed = CORNER_SPEED
+        if (command == LEFT_FINE).all() or (command == RIGHT_FINE).all():
+            speed = ROTATION_SPEED_FINE
+        alpha = speed * duration * direction * np.pi / 2
+        mat = get_rot_mat(alpha)
+        m = untransform_coords(CORNER_LEFT_OFFSET if direction == -1 else CORNER_RIGHT_OFFSET, centre, front)
+        f_new = np.matmul(mat, front - m) + m
+        c_new = np.matmul(mat, centre - m) + m
+        return c_new, f_new
     else: return centre, front
 
 
