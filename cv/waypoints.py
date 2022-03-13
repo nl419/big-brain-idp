@@ -430,9 +430,11 @@ class Subroutine:
         done = False
         force_get_next = False
         for i,a in enumerate(self._actions):
-            # Don't send too many commands at once
-            if len(commands) >= MAX_COMMAND_NUM: break
             while not done:
+                # Don't send too many commands at once
+                if len(commands) >= MAX_COMMAND_NUM: 
+                    done = True
+                    break
                 if self._has_run[i] and self._just_once[i]:
                     break # Just get the next command
                 if type(a) is Waypoint:
