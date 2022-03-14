@@ -2,6 +2,8 @@
 Reads video stream from idpcam2, finds robot location & orientation,
 calculates motor commands to arrive at target location."""
 
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
 import numpy as np
 import cv2
 # For the example cases at bottom
@@ -15,7 +17,7 @@ from find_dots import *
 import time
 import math
 from robot_properties import *
-ip = "http://192.168.137.45"
+ip = "http://192.168.137.55"
 
 SEND_COMMANDS = True # whether to attempt to send commands to the ip address
 MIN_COMMAND_INTERVAL = 1000 # in ms
@@ -226,6 +228,7 @@ class Navigator:
     _invmat: np.ndarray
     _mat: np.ndarray
 
+    _force_go_home: bool = False
     _got_block: bool = False
     _block_blue: bool = False
     _last_reading: int = 0
@@ -269,12 +272,7 @@ class Navigator:
     _ret_string: str = ""
     _command_timeout: int = 0
 
-    def __init__(self, videostream_url: str):
-        self._video = DotPatternVideo(videostream_url, 0.4)
-        frame, _,_,_ = self._video.find(annotate=False)
-        self._shift, self._invmat, self._mat = get_shift_invmat_mat(frame)
-        self._blues, self._reds = dropoff_boxes(frame, self._shift, self._invmat, IMPROVE_DROPOFF)
-
+    def _reconstruct_srts(self):
         self._home_srt = Subroutine([
             Waypoint(target_pos=untransform_board(self._shift, self._invmat, HOME_T), 
                 target_orient=untransform_board(self._shift, self._invmat, np.array((0,0))) - untransform_board(self._shift, self._invmat, HOME_T)
@@ -293,7 +291,7 @@ class Navigator:
                         target_pos=untransform_board(self._shift, self._invmat, BLUE_BARRIER_T),
                         target_orient=untransform_board(self._shift, self._invmat, BLUE_BARRIER_T + np.array((-1,1))) - \
                         untransform_board(self._shift, self._invmat, BLUE_BARRIER_T),
-                        robot_offset=CORNER_LEFT_OFFSET, pos_tol=20, move_backward_ok=False
+                        robot_offset=CORNER_LEFT_OFFSET, pos_tol=5, move_backward_ok=False
                     ),
                     (
                         CORNER_LEFT,
@@ -321,7 +319,7 @@ class Navigator:
                         target_pos=untransform_board(self._shift, self._invmat, BLUE_BARRIER_T),
                         target_orient=untransform_board(self._shift, self._invmat, BLUE_BARRIER_T + np.array((-1,-1))) - \
                         untransform_board(self._shift, self._invmat, BLUE_BARRIER_T),
-                        robot_offset=CORNER_RIGHT_OFFSET, pos_tol=20, move_backward_ok=False
+                        robot_offset=CORNER_RIGHT_OFFSET, pos_tol=5, move_backward_ok=False
                     ),
                     (
                         CORNER_RIGHT,
@@ -352,7 +350,7 @@ class Navigator:
                         target_pos=untransform_board(self._shift, self._invmat, RED_BARRIER_T),
                         target_orient=untransform_board(self._shift, self._invmat, RED_BARRIER_T + np.array((1,1))) - \
                         untransform_board(self._shift, self._invmat, RED_BARRIER_T),
-                        robot_offset=CORNER_RIGHT_OFFSET, pos_tol=20, move_backward_ok=False
+                        robot_offset=CORNER_RIGHT_OFFSET, pos_tol=5, move_backward_ok=False
                     ),
                     (
                         CORNER_RIGHT,
@@ -380,7 +378,7 @@ class Navigator:
                         target_pos=untransform_board(self._shift, self._invmat, RED_BARRIER_T),
                         target_orient=untransform_board(self._shift, self._invmat, RED_BARRIER_T + np.array((1,-1))) - \
                         untransform_board(self._shift, self._invmat, RED_BARRIER_T),
-                        robot_offset=CORNER_LEFT_OFFSET, pos_tol=20, move_backward_ok=False
+                        robot_offset=CORNER_LEFT_OFFSET, pos_tol=5, move_backward_ok=False
                     ),
                     (
                         CORNER_LEFT,
@@ -434,7 +432,7 @@ class Navigator:
                 Subroutine([
                     Waypoint(
                         target_pos=untransform_board(self._shift, self._invmat, BLUE_POINT_BOX2_T),
-                        target_orient=self._blues[1] - untransform_board(self._shift, self._invmat, BLUE_POINT_BOX1_T),
+                        target_orient=self._blues[1] - untransform_board(self._shift, self._invmat, BLUE_POINT_BOX2_T),
                         pos_tol=10, orient_tol=2, robot_offset=GATE_OFFSET
                     )
                 ]),
@@ -482,7 +480,7 @@ class Navigator:
                 Subroutine([
                     Waypoint(
                         target_pos=untransform_board(self._shift, self._invmat, RED_POINT_BOX2_T),
-                        target_orient=self._reds[1] - untransform_board(self._shift, self._invmat, RED_POINT_BOX1_T),
+                        target_orient=self._reds[1] - untransform_board(self._shift, self._invmat, RED_POINT_BOX2_T),
                         pos_tol=10, orient_tol=2, robot_offset=GATE_OFFSET
                     )
                 ]),
@@ -513,6 +511,14 @@ class Navigator:
         self._blue_dropoff_srts = [list(i) + [dropoff_srt] for i in b_d_srts]
         self._red_dropoff_srts = [list(i) + [dropoff_srt] for i in r_d_srts]
 
+
+    def __init__(self, videostream_url: str):
+        self._video = DotPatternVideo(videostream_url, 0.4)
+        frame, _,_,_ = self._video.find(annotate=False)
+        self._shift, self._invmat, self._mat = get_shift_invmat_mat(frame)
+        self._blues, self._reds = dropoff_boxes(frame, self._shift, self._invmat, IMPROVE_DROPOFF)
+        self._reconstruct_srts()
+
     def __repr__(self) -> str:
         result = (\
       f"Navigator:\n"
@@ -538,7 +544,7 @@ class Navigator:
         return result
 
     def _draw_srt(self, srt: Subroutine):
-        srt.draw(self._frame)
+        srt.draw(self._frame, centre=self._centre, front=self._front)
 
     def _run_srts(self):
         # Returns False if the end of the srts were reached
@@ -560,18 +566,26 @@ class Navigator:
         # Get a commmand list
         while True:
             # Handle being stuck
-            gate_pos = None
             if self._stuck_since is not None and self._stuck_since > now + STUCK_TIME_THRESH:
                 print("Executing stuck command")
                 command, duration = STUCK_COMMANDS[self._stuck_counter]
                 self._stuck_counter = (self._stuck_counter + 1) % len(STUCK_COMMANDS)
+                commands = [command]
+                durations = [duration]
+                gate_poss = [None]
+                colour_threshs = [-1]
                 break
             if self._srt_counter >= len(self._current_srts):
                 # Reached the end of the srts
                 self._srt_counter = 0
                 return False
+            if self._force_go_home:
+                srt = self._home_srt
+                print("Going home...")
+                commands, gate_poss, durations, colour_threshs = srt.get_command_list(self._centre, self._front, None if self._last_reading == 0 else self._last_reading + SENSOR_DELTA_THRESH)
+                break
             srt: Subroutine = self._current_srts[self._srt_counter]
-            print("Executing subroutine")
+            print("Executing subroutine...")
             commands, gate_poss, durations, colour_threshs = srt.get_command_list(self._centre, self._front, None if self._last_reading == 0 else self._last_reading + SENSOR_DELTA_THRESH)
             if len(commands) == 0:
                 # Subroutine completed, get the next one
@@ -579,26 +593,29 @@ class Navigator:
             else:
                 # We have a valid command list, send it.
                 break
-        get_string = ip + "/TRIGGER/"
+        get_string = ip
         take_reading = False
-        for i, (command, gate_pos, duration, colour_thresh) in enumerate(zip(commands, gate_poss, durations, colour_threshs)):
-            # Turn that into a getString
-            duration *= 1000 # Turn s into ms
-            if math.isnan(duration): 
-                # If nan, just give up, and pray the next frame is ok.
-                # This should never happen!
-                print("==============================")
-                print("DURATION WAS NAN, MUST FIX NOW")
-                print("==============================")
-                print(f"command: {command}")
-                print(repr(self))
-                time.sleep(5)
-                return True
-            duration = int(duration)
-            get_string += str(command[0]) + "/" + str(command[1]) + \
-                        "/" + (str(gate_pos) if gate_pos is not None else "") + "/" + str(duration) + \
-                        "/" + str(colour_thresh) + "/"
-            if colour_thresh != -1: take_reading = True
+        if len(commands) > 0:
+            get_string += "/TRIGGER/"
+            for i, (command, gate_pos, duration, colour_thresh) in enumerate(zip(commands, gate_poss, durations, colour_threshs)):
+                # Turn that into a getString
+                duration *= 1000 # Turn s into ms
+                if math.isnan(duration): 
+                    # If nan, just give up, and pray the next frame is ok.
+                    # This should never happen!
+                    print("==============================")
+                    print("DURATION WAS NAN, MUST FIX NOW")
+                    print("==============================")
+                    print(f"command: {command}")
+                    print(repr(self))
+                    time.sleep(5)
+                    return True
+                duration = int(duration)
+                get_string += str(command[0]) + "/" + str(command[1]) + \
+                            "/" + (str(gate_pos) if gate_pos is not None else "") + "/" + str(duration) + \
+                            "/" + (str(colour_thresh) if colour_thresh is not None else "-1") + "/"
+                # If any of the colour thresholds are not -1, take a sensor reading
+                if colour_thresh != -1 or colour_thresh is None: take_reading = True
 
         if SEND_COMMANDS: self._ret_string = urllib.request.urlopen(get_string)
         print(f"sending command {get_string}")
@@ -662,6 +679,7 @@ class Navigator:
 
         if not self._srts_up_to_date:
             self._current_srts = []
+            self._reconstruct_srts()
             if self._got_block:
                 # Go to dropoff
                 if TEST_CORNER:
@@ -766,7 +784,7 @@ class Navigator:
                 # Go to the block
                 self._current_srts.append(Subroutine([
                     Waypoint(
-                        target_pos=b_c, pos_tol=3, orient_tol=3, 
+                        target_pos=b_c, pos_tol=10, orient_tol=3, 
                         robot_offset=GATE_OFFSET,
                         orient_backward_ok=False, move_backward_ok=False
                     )
@@ -859,6 +877,9 @@ def _test_navigator():
         if key == ord('w'):
             cv2.imwrite("nav-test-fails/" + str(write_count) + ".jpg", frame)
             write_count += 1
+        if key == ord(' '):
+            nav._force_go_home = not nav._force_go_home
+
         if DEBUG_WAYPOINTS:
             if key == ord('n'):
                 nav._srt_counter += 1
@@ -868,6 +889,33 @@ def _test_navigator():
                 nav._block_blue = False
     cv2.destroyAllWindows()
 
+
+class Action(ABC):
+    @abstractmethod
+    def get_command(self, centre: np.ndarray, front: np.ndarray)\
+        -> "tuple[list[np.ndarray], list[int], list[float], list[int]]":
+        """Get a motor command, servo position, duration, and colour threshold
+        to execute this action.
+
+        Parameters
+        ----------
+        centre : np.ndarray
+            Coordinates of the centre of the robot
+        front : np.ndarray
+            Coordinates of the front of the robot
+
+        Returns
+        -------
+        motor_commands : np.ndarray
+            Required speeds of the left and right motors
+        servo_pos : int
+            Position of the servo, in degrees
+        duration : float
+            Duration of the commands, in seconds
+        colour_thresh : int
+            Sensor threshold for detecting a red block, -1 if no sensing needed
+        """
+        pass
 
 if __name__ == "__main__":
     # _test_calibrate()

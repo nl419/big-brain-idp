@@ -416,14 +416,20 @@ class Subroutine:
         self._just_once = just_once if just_once is not None else tuple([False] * len(actions))
         self._has_run = [False] * len(actions)
 
-    def draw(self, image: np.ndarray, colour: tuple = (0,255,0)):
+    def draw(self, image: np.ndarray, colour: tuple = (0,255,0), centre=None, front=None):
         # Draw all the waypoints on
         for a in self._actions:
             if type(a) is Waypoint:
                 a.draw(image, colour)
+                if centre is not None and front is not None:
+                    offset = untransform_coords(a._robot_offset, centre, front)
+                    cv2.drawMarker(image, np.int0(offset), colour, cv2.MARKER_CROSS, 10, 1)
 
-    def get_command_list(self, centre, front, colour_thresh = None):
+
+    def get_command_list(self, centre, front, colour_thresh=-1):
         # Return all the commands to be sent
+        # Colour thresh of None means "read the sensor, but don't light LEDs"
+        # Colour thresh of -1 means "don't read sensor"
         commands, durations, servo_poss, colour_threshs = [], [], [], []
         c_new = centre
         f_new = front
@@ -440,6 +446,8 @@ class Subroutine:
                 if type(a) is Waypoint:
                     # Try to get a rotation
                     command, duration = a.get_command(c_new, f_new, True)
+                    if command is not None and duration > LARGE_ROTATION_THRESH:
+                        done = True
                     if command is None:
                         # Must translate
                         command, duration = a.get_command(c_new, f_new, False)
@@ -466,6 +474,9 @@ class Subroutine:
             else:
                 break # Done was true, so stop getting commands
         
+        if len(commands) == 0:
+            for i in self._has_run:
+                i = False
         return commands, servo_poss, durations, colour_threshs
 
 # _T means transformed coordinates (relative to the yellow barriers)
@@ -514,14 +525,14 @@ HOME_T = np.array((-0.02170, -1.78574))
 
 ## Intermediate waypoints
 # Near corners on pickup / dropoff side
-BLUE_POINT_PICKUP_T = np.array((-1.61676, 0.34402)) 
-BLUE_POINT_DROPOFF_T = np.array((-1.58184, -0.26998))
+BLUE_POINT_PICKUP_T = np.array((-1.45095, 0.37588)) 
+BLUE_POINT_DROPOFF_T = np.array((-1.43618, -0.39134))
 # Near dropoff boxes
 BLUE_POINT_BOX1_T = np.array((-0.82942, -0.98781))
 BLUE_POINT_BOX2_T = np.array((-0.84395, -0.51035))
 
-RED_POINT_PICKUP_T = np.array((1.70740, 0.39640))
-RED_POINT_DROPOFF_T = np.array((1.70680, -0.31770))
+RED_POINT_PICKUP_T = np.array((1.48792, 0.51021))
+RED_POINT_DROPOFF_T = np.array((1.56643, -0.41359))
 RED_POINT_BOX1_T = np.array((0.79716, -1.04265))
 RED_POINT_BOX2_T = np.array((0.80650, -0.55608))
 
@@ -798,6 +809,6 @@ def _test_subroutine():
             orient = np.array((0, 1))
             reset_srt()
 if __name__ == "__main__":
-    _test_waypoint()
+    # _test_waypoint()
     # _test_waypoint_list()
-    # _test_subroutine()
+    _test_subroutine()

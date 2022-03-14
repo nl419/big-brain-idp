@@ -18,7 +18,7 @@ do_kmeans = False
 do_erode = False
 
 # Load in image
-image = cv2.imread('nav-test-fails/0.jpg')
+image = cv2.imread('nav-test-fails/1.jpg')
 # image = cv2.imread('dots/dot3.jpg')
 # image = cv2.imread('dots/dot14.jpg')
 # image = cv2.imread('checkerboard2/3.jpg')

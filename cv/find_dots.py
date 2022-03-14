@@ -1,3 +1,4 @@
+from turtle import undo
 import cv2
 import numpy as np
 from unfisheye import undistort
@@ -7,7 +8,7 @@ from robot_properties import *
 
 # Flag to print debug information
 _DEBUG = __name__ == "__main__"
-_DRAW_MASKS = True and _DEBUG
+_DRAW_MASKS = False and _DEBUG
 
 def drawMarkers(img: np.ndarray, points: "list[int]", lineColour: "list[int]", removeParallax: bool = True, drawForward: bool = True):
     """Draws markers on the image for a four point bounding box.
@@ -278,7 +279,7 @@ def _test_video():
             cv2.circle(image, np.int0(centre), 4, (255,255,0), -1)
             cv2.circle(image, np.int0(front), 4, (255,255,0), -1)
             cv2.circle(image, np.int0(get_CofR(centre, front)), 4, (255,255,0), -1)
-            cv2.circle(image, np.int0(untransform_coords(GATE_OFFSET, centre, front)), 4, (0,255,0), -1)
+            cv2.drawMarker(image, np.int0(untransform_coords(GATE_OFFSET, centre, front)), (0,255,0), cv2.MARKER_CROSS, 20, 1)
         # show image
         cv2.imshow('image', image)
         key = cv2.waitKey(1) & 0xFF
@@ -335,16 +336,90 @@ def angle(vec1: np.ndarray, vec2: np.ndarray):
         angle = -angle
     return angle
 
-def undo_parallax(coord: np.ndarray, height=0.11):
+def _test_calibrate_parallax():
+    from find_coords import dropoff_boxes, get_shift_invmat_mat
+    from scipy import optimize
+
+    USE_DUMMY_VALS = False
+
+    video = DotPatternVideo('http://localhost:8081/stream/video.mjpeg', 0.4, undo_parallax=False)
+    image, found,centre,front = video.find(annotate=False)
+    shift, invmat, mat = get_shift_invmat_mat(image)
+    cv2.imshow("before", image)
+    cv2.waitKey(0)
+    blues, reds = dropoff_boxes(image, shift, invmat, improve_dropoff=True)
+    boxes = blues + reds
+    print(boxes)
+    coords = []
+    # Do unparallaxing with some random height and centre
+    # Find the rms distance for each box
+    # Minimise sum of rms distances
+    if not USE_DUMMY_VALS:
+        for i in range(4):
+            coords.append([])
+            while True:
+                image, found,centre,front = video.find(shift=shift, invmat=invmat)
+                if found:
+                    gate_coord = untransform_coords(GATE_OFFSET, centre, front)
+                    cv2.circle(image, np.int0(centre), 4, (255,255,0), -1)
+                    cv2.circle(image, np.int0(front), 4, (255,255,0), -1)
+                    cv2.circle(image, np.int0(get_CofR(centre, front)), 4, (255,255,0), -1)
+                    cv2.drawMarker(image, np.int0(gate_coord), (0,255,255), cv2.MARKER_CROSS, 20, 1)
+                # show image
+                cv2.drawMarker(image, np.int0(boxes[i]), (255,255,0), cv2.MARKER_TILTED_CROSS, 20, 3)
+                cv2.imshow('image', image)
+                key = cv2.waitKey(1) & 0xFF
+                # Exit if q pressed
+                if key == ord('q'):
+                    return
+                if key == ord(' '):
+                    # Add coord to list of coordinates for current box
+                    if found: coords[i].append(gate_coord)
+                if key == ord('n'):
+                    # Turn the coord list into a numpy array
+                    coords[i] = np.array(coords[i])
+                    # Do next set of boxes
+                    break
+    else:
+        shift = np.array((1016/2, 720/2))
+        coords.append([(boxes[0]-shift)*1.1+shift])
+        coords.append([(boxes[1]-shift)*1.1+shift])
+        coords.append([(boxes[2]-shift)*1.1+shift])
+        coords.append([(boxes[3]-shift)*1.1+shift])
+
+    def sum_rms_distances(args):
+        nonlocal coords, boxes
+        cam_height, cx, cy = args
+        rms_dist = 0
+        for grp, box in zip(coords, boxes):
+            dist = []
+            for c in grp:
+                undone = undo_parallax(c, centre=np.array((cx,cy)), cam_height=cam_height)
+                dist.append(np.linalg.norm(undone - box))
+            dist = np.array(dist)
+            rms_dist += np.sqrt(np.mean(dist) ** 2)
+        print(f"args: {args}, rms: {rms_dist}")
+        return rms_dist
+    
+    initial_guess = (1.8, 1016/2, 720/2)
+    result = optimize.minimize(sum_rms_distances, initial_guess, method = 'Nelder-Mead')
+    if result.success:
+        print(result.x)
+    else:
+        print("Failed!")
+        print(result.message)
+    cv2.destroyAllWindows()
+
+def undo_parallax(coord: np.ndarray, height=0.11, centre=np.array((530,443.5)), cam_height=1.6531):
     # The dot pattern on the robot will appear to be further away
     # from the centre than it really is, due to parallax.
     # Similar triangles: 
     # 10 cm dot pattern height, 1.5 m camera height
     # smaller triangle = 1.63 m * 'a' m, bigger triangle = (1.5 + 0.1) m * 'a' * (1.6/1.5) m
     # Simply scale about the centre of the image to undo parallax
-    CAMERA_HEIGHT = 1.8 # 1.63
-    parallax_scale = (CAMERA_HEIGHT - height) / CAMERA_HEIGHT
-    parallax_shift = np.array((1016,760)) / 2
+    CAM_HEIGHT = cam_height
+    parallax_scale = (CAM_HEIGHT - height) / CAM_HEIGHT
+    parallax_shift = centre
     shifted = coord - parallax_shift
     scaled = shifted * parallax_scale
     undone = scaled + parallax_shift
@@ -357,8 +432,9 @@ class DotPatternVideo:
 
     balance = 0
     track_fail_count = 0
+    undo_parallax: bool = True
     
-    def __init__(self, filename: str, balance: float = 0):
+    def __init__(self, filename: str, balance: float = 0, undo_parallax=True):
         """Dot pattern tracker class, designed to work on video streams
 
         Parameters
@@ -372,6 +448,7 @@ class DotPatternVideo:
         self.filename = filename
         self.video = VideoCapture(filename)
         self.balance = balance
+        self.undo_parallax = undo_parallax
     
     def find(self, annotate = True, shift: np.ndarray = None, invmat: np.ndarray = None):
         """Find the dot pattern in the latest video frame, and draw it on if found.
@@ -409,7 +486,7 @@ class DotPatternVideo:
         centre = None
         front = None
         if found:
-            centre, front = drawMarkers(frame, bbox, (255, 0, 0))
+            centre, front = drawMarkers(frame, bbox, (255, 0, 0), removeParallax=self.undo_parallax)
             # centre, front = undo_parallax(centre), undo_parallax(front)
         else: # not found
             annotate and cv2.putText(frame, "Dot pattern not detected", (100, 150),
@@ -431,5 +508,6 @@ class DotPatternVideo:
 
 if _DEBUG:
     # _test_transform()
-    # _test_video()
-    _test_image()
+    _test_video()
+    # _test_image()
+    # _test_calibrate_parallax()

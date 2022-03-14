@@ -373,7 +373,7 @@ def _pick_points_normalised():
     # Return the points normalised by the barrier positions
 
     # image = cv2.imread('dots/dot17.jpg')
-    image = cv2.imread('dots/smol1.jpg')
+    image = cv2.imread('nav-test-fails/1.jpg')
     # image = cv2.imread('checkerboard2/3.jpg')
 
     image = undistort(image, 0.4)
@@ -404,7 +404,7 @@ def _test_dropoff_boxes():
     from unfisheye import undistort
 
     # image = cv2.imread('new_board/1.jpg')
-    image = cv2.imread('dots/smol4.jpg')
+    image = cv2.imread('nav-test-fails/1.jpg')
     # image = cv2.imread('dropoff-boxes/5.jpg')
     # image = cv2.imread('checkerboard2/3.jpg')
 
@@ -420,5 +420,5 @@ def _test_dropoff_boxes():
 
 if __name__=="__main__":
     # _pick_points()
-    _pick_points_normalised()
-    # _test_dropoff_boxes()
+    # _pick_points_normalised()
+    _test_dropoff_boxes()
