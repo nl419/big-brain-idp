@@ -339,27 +339,51 @@ def angle(vec1: np.ndarray, vec2: np.ndarray):
 def _test_calibrate_parallax():
     from find_coords import dropoff_boxes, get_shift_invmat_mat
     from scipy import optimize
+    import pickle
+    # Do unparallaxing with some random camera height, camera centre, and gate coords
+    # Find the rms distance between box centre and gate coords
+    # Minimise sum of rms distances by adjusting camera height, camera centre, gate coords.
 
-    USE_DUMMY_VALS = False
+    USE_PREVIOUS_IMAGES = False
 
-    video = DotPatternVideo('http://localhost:8081/stream/video.mjpeg', 0.4, undo_parallax=False)
-    image, found,centre,front = video.find(annotate=False)
-    shift, invmat, mat = get_shift_invmat_mat(image)
-    cv2.imshow("before", image)
-    cv2.waitKey(0)
-    blues, reds = dropoff_boxes(image, shift, invmat, improve_dropoff=True)
-    boxes = blues + reds
-    print(boxes)
-    coords = []
-    # Do unparallaxing with some random height and centre
-    # Find the rms distance for each box
-    # Minimise sum of rms distances
-    if not USE_DUMMY_VALS:
+    folder = "parallax_calib"
+    prefixes = ["blue1-", "blue2-", "red1-", "red2-"]
+    extension = ".jpg"
+
+    if USE_PREVIOUS_IMAGES:
+        import glob
+        with open(folder + "/boxes", 'rb') as fp:
+            boxes = pickle.load(fp)
+        images = [glob.glob(folder + '/' + prefix + '*' + extension) for prefix in prefixes]
+        coords = []
+        for i,grp in enumerate(images):
+            coords.append([])
+            for j,im in enumerate(grp):
+                found, bbox = getDotBbox(getDots(im))
+                if not found: 
+                    print(f"Image {j} for box {i} had no recognisable dot pattern.")
+                    continue
+                centre, front = drawMarkers(im, bbox, (255,0,0), False)
+                coords[i].append((centre, front))
+    else:
+        video = DotPatternVideo('http://localhost:8081/stream/video.mjpeg', 0.4, undo_parallax=False)
+        image, found,centre,front = video.find(annotate=False)
+        shift, invmat, mat = get_shift_invmat_mat(image)
+        cv2.imshow("before", image)
+        cv2.waitKey(0)
+        blues, reds = dropoff_boxes(image, shift, invmat, improve_dropoff=True)
+        boxes = blues + reds
+        print(boxes)
+        coords = []
         for i in range(4):
             coords.append([])
+            count = 0
             while True:
-                image, found,centre,front = video.find(shift=shift, invmat=invmat)
-                if found:
+                image,found,centre,front = video.find(annotate=False, shift=shift, invmat=invmat)
+                original = image.copy()
+                if not found:
+                    print("Not found!")
+                else:
                     gate_coord = untransform_coords(GATE_OFFSET, centre, front)
                     cv2.circle(image, np.int0(centre), 4, (255,255,0), -1)
                     cv2.circle(image, np.int0(front), 4, (255,255,0), -1)
@@ -373,27 +397,30 @@ def _test_calibrate_parallax():
                 if key == ord('q'):
                     return
                 if key == ord(' '):
+                    with open(folder + "/boxes", 'wb') as fp:
+                        pickle.dump(boxes, fp)
                     # Add coord to list of coordinates for current box
-                    if found: coords[i].append(gate_coord)
+                    if found:
+                        coords[i].append((centre, front))
+                        filename = folder + "/" + prefixes[i] + str(count) + extension
+                        count += 1
+                        cv2.imwrite(filename, original)
+                        print("Wrote file ", filename)
                 if key == ord('n'):
                     # Turn the coord list into a numpy array
                     coords[i] = np.array(coords[i])
+                    print("Moving to next box")
                     # Do next set of boxes
                     break
-    else:
-        shift = np.array((1016/2, 720/2))
-        coords.append([(boxes[0]-shift)*1.1+shift])
-        coords.append([(boxes[1]-shift)*1.1+shift])
-        coords.append([(boxes[2]-shift)*1.1+shift])
-        coords.append([(boxes[3]-shift)*1.1+shift])
 
     def sum_rms_distances(args):
         nonlocal coords, boxes
-        cam_height, cx, cy = args
+        cam_height, cx, cy, gx, gy = args
         rms_dist = 0
         for grp, box in zip(coords, boxes):
             dist = []
-            for c in grp:
+            for coord in grp:
+                c = untransform_coords(np.array((gx, gy)), coord[0], coord[1])
                 undone = undo_parallax(c, centre=np.array((cx,cy)), cam_height=cam_height)
                 dist.append(np.linalg.norm(undone - box))
             dist = np.array(dist)
@@ -401,9 +428,10 @@ def _test_calibrate_parallax():
         print(f"args: {args}, rms: {rms_dist}")
         return rms_dist
     
-    initial_guess = (1.8, 1016/2, 720/2)
+    initial_guess = (1.8, 1016/2, 720/2, 1.4, 0)
     result = optimize.minimize(sum_rms_distances, initial_guess, method = 'Nelder-Mead')
     if result.success:
+        print("Success.")
         print(result.x)
     else:
         print("Failed!")
@@ -510,4 +538,4 @@ if _DEBUG:
     # _test_transform()
     _test_video()
     # _test_image()
-    # _test_calibrate_parallax()
+    _test_calibrate_parallax()
