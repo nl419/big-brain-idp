@@ -19,11 +19,11 @@ import math
 from robot_properties import *
 ip = "http://192.168.137.55"
 
-SEND_COMMANDS = True # whether to attempt to send commands to the ip address
+SEND_COMMANDS = False # whether to attempt to send commands to the ip address
 MIN_COMMAND_INTERVAL = 1000 # in ms
 DEBUG_WAYPOINTS = True
-IMPROVE_DROPOFF = True
-READ_SENSOR = True
+IMPROVE_DROPOFF = False
+READ_SENSOR = False
 CHECK_STUCK = False
 
 TEST_CORNER = False # Whether to test the corner
@@ -424,7 +424,7 @@ class Navigator:
                 Subroutine([
                     Waypoint(
                         target_pos=self._blues[0],
-                        pos_tol=1, orient_tol=1, robot_offset=GATE_OFFSET
+                        pos_tol=3, orient_tol=2, robot_offset=GATE_OFFSET
                     )
                 ], skip_checks=False)
             ),
@@ -439,11 +439,18 @@ class Navigator:
                 Subroutine([
                     Waypoint(
                         target_pos=self._blues[1],
-                        pos_tol=1, orient_tol=1, robot_offset=GATE_OFFSET
+                        pos_tol=3, orient_tol=2, robot_offset=GATE_OFFSET
                     )
                 ], False)
             ),
             (
+                Subroutine([
+                    Waypoint(
+                        target_pos=untransform_board(self._shift, self._invmat, BLUE_POINT_BOX2_T),
+                        target_orient=self._blues[1] - untransform_board(self._shift, self._invmat, BLUE_POINT_BOX2_T),
+                        pos_tol=20, orient_tol=5, robot_offset=GATE_OFFSET
+                    )
+                ]),
                 Subroutine([
                     Waypoint(
                         target_pos=self._blues[1] + np.array((50,0)),
@@ -454,7 +461,7 @@ class Navigator:
                 Subroutine([
                     Waypoint(
                         target_pos=self._blues[1],
-                        pos_tol=1, orient_tol=1, robot_offset=GATE_OFFSET
+                        pos_tol=3, orient_tol=2, robot_offset=GATE_OFFSET
                     )
                 ], False)
             )
@@ -472,7 +479,7 @@ class Navigator:
                 Subroutine([
                     Waypoint(
                         target_pos=self._reds[0],
-                        pos_tol=1, orient_tol=1, robot_offset=GATE_OFFSET
+                        pos_tol=3, orient_tol=2, robot_offset=GATE_OFFSET
                     )
                 ], False)
             ),
@@ -487,11 +494,18 @@ class Navigator:
                 Subroutine([
                     Waypoint(
                         target_pos=self._reds[1],
-                        pos_tol=1, orient_tol=1, robot_offset=GATE_OFFSET
+                        pos_tol=3, orient_tol=2, robot_offset=GATE_OFFSET
                     )
                 ], False)
             ),
             (
+                Subroutine([
+                    Waypoint(
+                        target_pos=untransform_board(self._shift, self._invmat, RED_POINT_BOX2_T),
+                        target_orient=self._reds[1] - untransform_board(self._shift, self._invmat, RED_POINT_BOX2_T),
+                        pos_tol=20, orient_tol=5, robot_offset=COFR_OFFSET
+                    )
+                ]),
                 Subroutine([
                     Waypoint(
                         target_pos=self._reds[1] + np.array((0,-50)),
@@ -502,7 +516,7 @@ class Navigator:
                 Subroutine([
                     Waypoint(
                         target_pos=self._reds[1],
-                        pos_tol=1, orient_tol=1, robot_offset=GATE_OFFSET
+                        pos_tol=3, orient_tol=2, robot_offset=GATE_OFFSET
                     )
                 ], False)
             )
@@ -581,6 +595,14 @@ class Navigator:
                 return False
             if self._force_go_home:
                 srt = self._home_srt
+                for srt in self._blue_dropoff_srts:
+                    srt.draw(self._frame, colour=(255,0,0))
+                for srt in self._red_dropoff_srts:
+                    srt.draw(self._frame, colour=(0,0,255))
+                for srt in self._blue_corner_srts:
+                    srt.draw(self._frame)
+                for srt in self._red_corner_srts:
+                    srt.draw(self._frame)
                 print("Going home...")
                 commands, gate_poss, durations, colour_threshs = srt.get_command_list(self._centre, self._front, None if self._last_reading == 0 else self._last_reading + SENSOR_DELTA_THRESH)
                 break
@@ -685,9 +707,12 @@ class Navigator:
                 if TEST_CORNER:
                     self._current_srts.extend(self._blue_corner_srts[1] if TEST_CORNER_BLUE else self._red_corner_srts[1])
                     return True
-                self._current_srts.extend(self._blue_corner_srts[1] if self._block_blue else self._red_corner_srts[1])
                 i = self._blue_count if self._block_blue else self._red_count
-                assert i < 2, "Too many " + ("blue" if self._block_blue else "red") + " blocks have been found"
+                if i >= 2:
+                    print("Too many " + ("blue" if self._block_blue else "red") + " blocks have been found")
+                    print("Flipping colour...")
+                    self._block_blue = not self._block_blue
+                self._current_srts.extend(self._blue_corner_srts[1] if self._block_blue else self._red_corner_srts[1])
                 # Put the very last block in backwards, so that home can still be driven to easily
                 if (self._red_count == 2 or self._blue_count == 2) and i == 1:
                     i = 2
@@ -850,6 +875,19 @@ class Navigator:
         if len(self._current_srts) > 0 and self._srt_counter < len(self._current_srts):
             self._draw_srt(self._current_srts[self._srt_counter])
         
+        if self._force_go_home:
+            all = []
+            all.extend(self._blue_dropoff_srts)
+            all.extend(self._red_dropoff_srts)
+            all.extend(self._blue_corner_srts)
+            all.extend(self._red_corner_srts)
+            for i,grp in enumerate(all):
+                colour = (0,255,0)
+                if i < 3: colour = (255,0,0)
+                elif i < 6: colour = (0,0,255)
+                for srt in grp:
+                    srt.draw(self._frame, colour)
+
         # Skip this frame if state update failed
         if not ok: return self._frame, False
         self._srts_up_to_date = True # If we got here, the waypoints must be ok.
