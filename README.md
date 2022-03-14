@@ -35,18 +35,18 @@ Software:
 - [x] Redo checkerboard calibration
 - [x] Track orientation
 - [x] Make tracking robust vs lighting changes
-- [ ] Track blocks
-- [ ] Track target locations
+- [x] Track blocks
+- [x] Track target locations
 - [x] Navigation code
 - [x] Arduino WiFi code
 - [x] Laptop WiFi code
 
 Electrical:
 
-- [ ] LED display
-- [ ] Colour detector
+- [x] LED display
+- [x] Colour detector
 
 Mechanical:
 
-- [ ] Final chassis
-- [ ] Block shover
+- [x] Final chassis
+- [x] Block shover
