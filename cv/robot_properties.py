@@ -38,8 +38,8 @@ DOT_PATTERN_DIR = -1 # -1 = forward in the
 #------------------
 
 # New motors:
-FINE_THRESH = 1 # in seconds
-FORWARD_FINE = np.array((150,150))
+FINE_THRESH = 0.7 # in seconds
+FORWARD_FINE = np.array((155,150))
 BACKWARD_FINE = -FORWARD_FINE
 FORWARD = np.array((255,255))
 BACKWARD = -FORWARD
@@ -70,7 +70,7 @@ CORNER_RIGHT_OFFSET = np.array([-1.0455142,  3.9454316]) #
 
 GATE_UP = 135
 GATE_DOWN = 45
-GATE_OFFSET = np.array((1.4,0))
+GATE_OFFSET = np.array((1.25,0))
 MIDDLE_OFFSET = np.array((0,0))
 
 SENSOR_OFFSET_DETECT = np.array((2.3,1))

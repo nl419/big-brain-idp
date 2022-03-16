@@ -417,12 +417,12 @@ def _test_calibrate_parallax():
         nonlocal coords, boxes
         cam_height, cx, cy, gx, gy = args
         rms_dist = 0
+        fun = lambda x: undo_parallax(x, centre=np.array((cx,cy)), cam_height=cam_height)
         for grp, box in zip(coords, boxes):
             dist = []
             for coord in grp:
-                c = untransform_coords(np.array((gx, gy)), coord[0], coord[1])
-                undone = undo_parallax(c, centre=np.array((cx,cy)), cam_height=cam_height)
-                dist.append(np.linalg.norm(undone - box))
+                c = untransform_coords(np.array((gx, gy)), fun(coord[0]), fun(coord[1]))
+                dist.append(np.linalg.norm(c - box))
             dist = np.array(dist)
             rms_dist += np.sqrt(np.mean(dist) ** 2)
         print(f"args: {args}, rms: {rms_dist}")
@@ -438,7 +438,7 @@ def _test_calibrate_parallax():
         print(result.message)
     cv2.destroyAllWindows()
 
-def undo_parallax(coord: np.ndarray, height=0.11, centre=np.array((530,443.5)), cam_height=1.6531):
+def undo_parallax(coord: np.ndarray, height=0.11, centre=np.array((508,430)), cam_height=1.684):
     # The dot pattern on the robot will appear to be further away
     # from the centre than it really is, due to parallax.
     # Similar triangles: 
@@ -536,6 +536,6 @@ class DotPatternVideo:
 
 if _DEBUG:
     # _test_transform()
-    _test_video()
+    # _test_video()
     # _test_image()
     _test_calibrate_parallax()

@@ -3,6 +3,8 @@ import cv2
 import numpy as np
 
 _DEBUG = __name__ == "__main__"
+_DRAW_MASKS = True
+
 
 # function to display the coordinates of
 # of the points clicked on the image
@@ -178,14 +180,14 @@ def dropoff_boxes(img: np.ndarray, shift=None, invmat=None, improve_dropoff=True
     # image = crop_board(image, shift, invmat)
     image = remove_shadow(image, 81)
     image = crop_board(image, shift, invmat, dropoff_area)
-    if _DEBUG:
+    if _DRAW_MASKS:
         cv2.imshow("after crop", image)
         cv2.waitKey(0)
         cv2.destroyWindow("after crop")
     image = kmeans(image, 4)
 
 
-    if _DEBUG:
+    if _DRAW_MASKS:
         cv2.imshow("Kmeans", image)
         cv2.waitKey(0)
         cv2.destroyWindow("Kmeans")
@@ -197,7 +199,7 @@ def dropoff_boxes(img: np.ndarray, shift=None, invmat=None, improve_dropoff=True
     hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
     mask = cv2.inRange(hsv, lower, upper)
 
-    if _DEBUG:
+    if _DRAW_MASKS:
         cv2.imshow("mask", mask)
         cv2.waitKey(0)
         cv2.destroyWindow("mask")
@@ -213,7 +215,7 @@ def dropoff_boxes(img: np.ndarray, shift=None, invmat=None, improve_dropoff=True
     # Filter out contours of wrong size
     # Calculate centres for the remaining contours
     cnts, _ = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-    if _DEBUG:
+    if _DRAW_MASKS:
         image = img.copy()
         cv2.drawContours(image, cnts, -1, (255,255,0), 2)
         cv2.imshow("contours", image)
@@ -226,15 +228,15 @@ def dropoff_boxes(img: np.ndarray, shift=None, invmat=None, improve_dropoff=True
     for c in cnts:
         M = cv2.moments(c)
         area = M['m00']
-        _DEBUG and print(area)
-        if area > 50 and area < 400:
+        print(area)
+        if area > 100 and area < 200:
             centre = (M['m10']/M['m00'], M['m01']/M['m00'])
             centre = np.array(centre)
             centres.append(centre)
             areas.append(area)
-            _DEBUG and cv2.drawContours(image, [c], -1, (255,255,0), 2)
+            if _DRAW_MASKS: cv2.drawContours(image, [c], -1, (255,255,0), 2)
     
-    if _DEBUG:
+    if _DRAW_MASKS:
         print(centres)
         cv2.imshow("filtered", image)
         cv2.waitKey(0)

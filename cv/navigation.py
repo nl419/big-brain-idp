@@ -17,13 +17,13 @@ from find_dots import *
 import time
 import math
 from robot_properties import *
-ip = "http://192.168.137.55"
+ip = "http://192.168.137.187"
 
-SEND_COMMANDS = False # whether to attempt to send commands to the ip address
+SEND_COMMANDS = True # whether to attempt to send commands to the ip address
 MIN_COMMAND_INTERVAL = 1000 # in ms
 DEBUG_WAYPOINTS = True
-IMPROVE_DROPOFF = False
-READ_SENSOR = False
+IMPROVE_DROPOFF = True
+READ_SENSOR = True
 CHECK_STUCK = False
 
 TEST_CORNER = False # Whether to test the corner
@@ -228,7 +228,7 @@ class Navigator:
     _invmat: np.ndarray
     _mat: np.ndarray
 
-    _force_go_home: bool = False
+    _force_go_home: bool = True
     _got_block: bool = False
     _block_blue: bool = False
     _last_reading: int = 0
@@ -283,7 +283,7 @@ class Navigator:
                 Subroutine([
                     Waypoint(
                         target_pos=untransform_board(self._shift, self._invmat, BLUE_POINT_DROPOFF_T),
-                        pos_tol=40, move_backward_ok=False
+                        pos_tol=40, move_backward_ok=False, do_fine=False
                     )
                 ], just_once=tuple([True])),
                 Subroutine([
@@ -291,7 +291,7 @@ class Navigator:
                         target_pos=untransform_board(self._shift, self._invmat, BLUE_BARRIER_T),
                         target_orient=untransform_board(self._shift, self._invmat, BLUE_BARRIER_T + np.array((-1,1))) - \
                         untransform_board(self._shift, self._invmat, BLUE_BARRIER_T),
-                        robot_offset=CORNER_LEFT_OFFSET, pos_tol=5, move_backward_ok=False
+                        robot_offset=CORNER_LEFT_OFFSET, pos_tol=10, move_backward_ok=False
                     ),
                     (
                         CORNER_LEFT,
@@ -303,7 +303,7 @@ class Navigator:
                 Subroutine([
                     Waypoint(
                         target_pos=untransform_board(self._shift, self._invmat, BLUE_POINT_PICKUP_T),
-                        pos_tol=40, move_backward_ok=False
+                        pos_tol=40, move_backward_ok=False, do_fine=False
                     )
                 ], just_once=tuple([True]))
             ),
@@ -311,7 +311,7 @@ class Navigator:
                 Subroutine([
                     Waypoint(
                         target_pos=untransform_board(self._shift, self._invmat, BLUE_POINT_PICKUP_T),
-                        pos_tol=40, move_backward_ok=False
+                        pos_tol=40, move_backward_ok=False, do_fine=False
                     )
                 ]),
                 Subroutine([
@@ -319,7 +319,7 @@ class Navigator:
                         target_pos=untransform_board(self._shift, self._invmat, BLUE_BARRIER_T),
                         target_orient=untransform_board(self._shift, self._invmat, BLUE_BARRIER_T + np.array((-1,-1))) - \
                         untransform_board(self._shift, self._invmat, BLUE_BARRIER_T),
-                        robot_offset=CORNER_RIGHT_OFFSET, pos_tol=5, move_backward_ok=False
+                        robot_offset=CORNER_RIGHT_OFFSET, pos_tol=10, move_backward_ok=False
                     ),
                     (
                         CORNER_RIGHT,
@@ -331,7 +331,7 @@ class Navigator:
                 Subroutine([
                     Waypoint(
                         target_pos=untransform_board(self._shift, self._invmat, BLUE_POINT_DROPOFF_T),
-                        pos_tol=40, move_backward_ok=False
+                        pos_tol=40, move_backward_ok=False, do_fine=False
                     )
                 ])
             )
@@ -342,7 +342,7 @@ class Navigator:
                 Subroutine([
                     Waypoint(
                         target_pos=untransform_board(self._shift, self._invmat, RED_POINT_DROPOFF_T),
-                        pos_tol=40, move_backward_ok=False
+                        pos_tol=40, move_backward_ok=False, do_fine=False
                     )
                 ], just_once=tuple([True])),
                 Subroutine([
@@ -350,7 +350,7 @@ class Navigator:
                         target_pos=untransform_board(self._shift, self._invmat, RED_BARRIER_T),
                         target_orient=untransform_board(self._shift, self._invmat, RED_BARRIER_T + np.array((1,1))) - \
                         untransform_board(self._shift, self._invmat, RED_BARRIER_T),
-                        robot_offset=CORNER_RIGHT_OFFSET, pos_tol=5, move_backward_ok=False
+                        robot_offset=CORNER_RIGHT_OFFSET, pos_tol=10, move_backward_ok=False
                     ),
                     (
                         CORNER_RIGHT,
@@ -362,7 +362,7 @@ class Navigator:
                 Subroutine([
                     Waypoint(
                         target_pos=untransform_board(self._shift, self._invmat, RED_POINT_PICKUP_T),
-                        pos_tol=40, move_backward_ok=False
+                        pos_tol=40, move_backward_ok=False, do_fine=False
                     )
                 ], just_once=tuple([True]))
             ),
@@ -370,7 +370,7 @@ class Navigator:
                 Subroutine([
                     Waypoint(
                         target_pos=untransform_board(self._shift, self._invmat, RED_POINT_PICKUP_T),
-                        pos_tol=40, move_backward_ok=False
+                        pos_tol=40, move_backward_ok=False, do_fine=False
                     )
                 ], just_once=tuple([True])),
                 Subroutine([
@@ -378,7 +378,7 @@ class Navigator:
                         target_pos=untransform_board(self._shift, self._invmat, RED_BARRIER_T),
                         target_orient=untransform_board(self._shift, self._invmat, RED_BARRIER_T + np.array((1,-1))) - \
                         untransform_board(self._shift, self._invmat, RED_BARRIER_T),
-                        robot_offset=CORNER_LEFT_OFFSET, pos_tol=5, move_backward_ok=False
+                        robot_offset=CORNER_LEFT_OFFSET, pos_tol=10, move_backward_ok=False
                     ),
                     (
                         CORNER_LEFT,
@@ -390,7 +390,7 @@ class Navigator:
                 Subroutine([
                     Waypoint(
                         target_pos=untransform_board(self._shift, self._invmat, RED_POINT_DROPOFF_T),
-                        pos_tol=40, move_backward_ok=False
+                        pos_tol=40, move_backward_ok=False, do_fine=False
                     )
                 ], just_once=tuple([True]))
             )
@@ -412,56 +412,62 @@ class Navigator:
             )
         ], just_once=(True, True))
 
+        before_dist = 25
+        left = np.array((-before_dist, 0))
+        right = np.array((before_dist, 0))
+        up = np.array((0, -before_dist))
+        down = np.array((0, before_dist))
+
         b_d_srts = [
             (
                 Subroutine([
                     Waypoint(
-                        target_pos=untransform_board(self._shift, self._invmat, BLUE_POINT_BOX1_T),
-                        target_orient=self._blues[0] - untransform_board(self._shift, self._invmat, BLUE_POINT_BOX1_T),
-                        pos_tol=10, orient_tol=2, robot_offset=GATE_OFFSET
+                        target_pos=self._blues[0] + left,
+                        target_orient=-left,
+                        pos_tol=5, orient_tol=2, robot_offset=GATE_OFFSET
                     )
                 ]),
                 Subroutine([
                     Waypoint(
                         target_pos=self._blues[0],
-                        pos_tol=3, orient_tol=2, robot_offset=GATE_OFFSET
+                        pos_tol=2, orient_tol=2, robot_offset=GATE_OFFSET
                     )
                 ], skip_checks=False)
             ),
             (
                 Subroutine([
                     Waypoint(
-                        target_pos=untransform_board(self._shift, self._invmat, BLUE_POINT_BOX2_T),
-                        target_orient=self._blues[1] - untransform_board(self._shift, self._invmat, BLUE_POINT_BOX2_T),
-                        pos_tol=10, orient_tol=2, robot_offset=GATE_OFFSET
+                        target_pos=self._blues[1] + left,
+                        target_orient=-left,
+                        pos_tol=5, orient_tol=2, robot_offset=GATE_OFFSET
                     )
                 ]),
                 Subroutine([
                     Waypoint(
                         target_pos=self._blues[1],
-                        pos_tol=3, orient_tol=2, robot_offset=GATE_OFFSET
+                        pos_tol=2, orient_tol=2, robot_offset=GATE_OFFSET
                     )
                 ], False)
             ),
             (
                 Subroutine([
                     Waypoint(
-                        target_pos=untransform_board(self._shift, self._invmat, BLUE_POINT_BOX2_T),
-                        target_orient=self._blues[1] - untransform_board(self._shift, self._invmat, BLUE_POINT_BOX2_T),
+                        target_pos=self._blues[1] + left,
+                        target_orient=-left,
                         pos_tol=20, orient_tol=5, robot_offset=GATE_OFFSET
                     )
                 ]),
                 Subroutine([
                     Waypoint(
-                        target_pos=self._blues[1] + np.array((50,0)),
-                        target_orient=np.array((-100,0)),
-                        pos_tol=10, orient_tol=2, robot_offset=GATE_OFFSET
+                        target_pos=self._blues[1] + right,
+                        target_orient=-right,
+                        pos_tol=5, orient_tol=2, robot_offset=GATE_OFFSET
                     )
                 ]),
                 Subroutine([
                     Waypoint(
                         target_pos=self._blues[1],
-                        pos_tol=3, orient_tol=2, robot_offset=GATE_OFFSET
+                        pos_tol=2, orient_tol=2, robot_offset=GATE_OFFSET
                     )
                 ], False)
             )
@@ -471,52 +477,52 @@ class Navigator:
             (
                 Subroutine([
                     Waypoint(
-                        target_pos=untransform_board(self._shift, self._invmat, RED_POINT_BOX1_T),
-                        target_orient=self._reds[0] - untransform_board(self._shift, self._invmat, RED_POINT_BOX1_T),
-                        pos_tol=10, orient_tol=2, robot_offset=GATE_OFFSET
+                        target_pos=self._reds[0] + down,
+                        target_orient=-down,
+                        pos_tol=5, orient_tol=2, robot_offset=GATE_OFFSET
                     )
                 ]),
                 Subroutine([
                     Waypoint(
                         target_pos=self._reds[0],
-                        pos_tol=3, orient_tol=2, robot_offset=GATE_OFFSET
+                        pos_tol=2, orient_tol=2, robot_offset=GATE_OFFSET
                     )
                 ], False)
             ),
             (
                 Subroutine([
                     Waypoint(
-                        target_pos=untransform_board(self._shift, self._invmat, RED_POINT_BOX2_T),
-                        target_orient=self._reds[1] - untransform_board(self._shift, self._invmat, RED_POINT_BOX2_T),
-                        pos_tol=10, orient_tol=2, robot_offset=GATE_OFFSET
+                        target_pos=self._reds[1] + down,
+                        target_orient=-down,
+                        pos_tol=5, orient_tol=2, robot_offset=GATE_OFFSET
                     )
                 ]),
                 Subroutine([
                     Waypoint(
-                        target_pos=self._reds[1],
-                        pos_tol=3, orient_tol=2, robot_offset=GATE_OFFSET
+                        target_pos=self._reds[1] + np.array((0,-1)), # Fudge factor
+                        pos_tol=2, orient_tol=2, robot_offset=GATE_OFFSET
                     )
                 ], False)
             ),
             (
                 Subroutine([
                     Waypoint(
-                        target_pos=untransform_board(self._shift, self._invmat, RED_POINT_BOX2_T),
-                        target_orient=self._reds[1] - untransform_board(self._shift, self._invmat, RED_POINT_BOX2_T),
-                        pos_tol=20, orient_tol=5, robot_offset=COFR_OFFSET
+                        target_pos=self._reds[1] + down,
+                        target_orient=-down,
+                        pos_tol=20, orient_tol=5, robot_offset=GATE_OFFSET
                     )
                 ]),
                 Subroutine([
                     Waypoint(
-                        target_pos=self._reds[1] + np.array((0,-50)),
-                        target_orient=np.array((0,50)),
-                        pos_tol=10, orient_tol=2, robot_offset=GATE_OFFSET
+                        target_pos=self._reds[1] + up,
+                        target_orient=-up,
+                        pos_tol=5, orient_tol=2, robot_offset=GATE_OFFSET
                     )
                 ]),
                 Subroutine([
                     Waypoint(
                         target_pos=self._reds[1],
-                        pos_tol=3, orient_tol=2, robot_offset=GATE_OFFSET
+                        pos_tol=2, orient_tol=2, robot_offset=GATE_OFFSET
                     )
                 ], False)
             )
@@ -527,7 +533,7 @@ class Navigator:
 
 
     def __init__(self, videostream_url: str):
-        self._video = DotPatternVideo(videostream_url, 0.4)
+        self._video = DotPatternVideo(videostream_url, 0.4, undo_parallax=False)
         frame, _,_,_ = self._video.find(annotate=False)
         self._shift, self._invmat, self._mat = get_shift_invmat_mat(frame)
         self._blues, self._reds = dropoff_boxes(frame, self._shift, self._invmat, IMPROVE_DROPOFF)
@@ -595,14 +601,6 @@ class Navigator:
                 return False
             if self._force_go_home:
                 srt = self._home_srt
-                for srt in self._blue_dropoff_srts:
-                    srt.draw(self._frame, colour=(255,0,0))
-                for srt in self._red_dropoff_srts:
-                    srt.draw(self._frame, colour=(0,0,255))
-                for srt in self._blue_corner_srts:
-                    srt.draw(self._frame)
-                for srt in self._red_corner_srts:
-                    srt.draw(self._frame)
                 print("Going home...")
                 commands, gate_poss, durations, colour_threshs = srt.get_command_list(self._centre, self._front, None if self._last_reading == 0 else self._last_reading + SENSOR_DELTA_THRESH)
                 break
@@ -693,6 +691,8 @@ class Navigator:
         if not reuse_frame: 
             self._frame, self._found, new_c, new_f = self._video.find(shift=self._shift, invmat=self._invmat)
             if not self._found: return False
+            new_c = undo_parallax(new_c)
+            new_f = undo_parallax(new_f)
             self._delta = max(np.linalg.norm(new_c - self._centre), np.linalg.norm(new_f - self._front))
             self._centre = new_c
             self._front = new_f
@@ -887,6 +887,8 @@ class Navigator:
                 elif i < 6: colour = (0,0,255)
                 for srt in grp:
                     srt.draw(self._frame, colour)
+            if ok:
+                cv2.drawMarker(self._frame, np.int0(untransform_coords(GATE_OFFSET, self._centre, self._front)), (0,255,255), cv2.MARKER_CROSS, 30, 1)
 
         # Skip this frame if state update failed
         if not ok: return self._frame, False
@@ -916,6 +918,8 @@ def _test_navigator():
             cv2.imwrite("nav-test-fails/" + str(write_count) + ".jpg", frame)
             write_count += 1
         if key == ord(' '):
+            nav._blue_count = 0
+            nav._red_count = 0
             nav._force_go_home = not nav._force_go_home
 
         if DEBUG_WAYPOINTS:

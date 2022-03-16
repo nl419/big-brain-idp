@@ -16,6 +16,7 @@ class Waypoint:
     _orient_tol: float # radians
     _orient_backward_ok: bool
     _move_backward_ok: bool
+    _do_fine: bool
 
     # The position in the robot's coordinate system which we want to get to 
     # target_pos
@@ -23,7 +24,7 @@ class Waypoint:
 
     def __init__(self, target_pos: np.ndarray, target_orient: np.ndarray = None, 
                  pos_tol: float = 10, orient_tol: float = 5, robot_offset: np.ndarray = np.array((0,0)), 
-                 orient_backward_ok: bool = False, move_backward_ok: bool = True, near_tol: float = -1):
+                 orient_backward_ok: bool = False, move_backward_ok: bool = True, near_tol: float = -1, do_fine: bool = True):
         """A waypoint on the board. Run [Waypoint object].get_command(centre, front) 
         to get the next command & duration
 
@@ -43,8 +44,10 @@ class Waypoint:
             Whether aligning to the reverse orientation is ok, by default False
         move_backward_ok : bool, optional
             Whether moving backward for large distances is ok, by default True.
-        near_tol : float
+        near_tol : float, optional
             Threshold for reversing a little bit instead of doing large turns, default -1
+        do_fine : float, optional
+            Whether swapping to fine movements are allowed, default True
         """
         self._target_pos = target_pos
         if target_orient is None:
@@ -57,6 +60,7 @@ class Waypoint:
         self._orient_backward_ok = orient_backward_ok
         self._move_backward_ok = move_backward_ok
         self._near_tol = near_tol
+        self._do_fine = do_fine
 
     def _get_rotation_noalign(self, centre, front):
         ### Assuming mag_tm is larger than mag_om_
@@ -198,7 +202,7 @@ class Waypoint:
                         if rotation_only: return None, 0
                         return BACKWARD, self._near_tol / MOVEMENT_SPEED
                     duration = abs(rot) / ROTATION_SPEED
-                    if duration > FINE_THRESH:
+                    if self._do_fine and duration > FINE_THRESH:
                         command = RIGHT if rot > 0 else LEFT
                         return command, duration
                     command = RIGHT_FINE if rot > 0 else LEFT_FINE
@@ -209,7 +213,7 @@ class Waypoint:
                 # Should now just head to the point.
                 trans = self._get_translation_align(centre, front)
                 duration = abs(trans) / MOVEMENT_SPEED
-                if duration > FINE_THRESH:
+                if self._do_fine and duration > FINE_THRESH:
                     command = FORWARD if trans > 0 else BACKWARD
                     return command, duration
                 command = FORWARD_FINE if trans > 0 else BACKWARD_FINE
@@ -219,7 +223,7 @@ class Waypoint:
             rot = self._get_rotation_align_target(centre, front)
             if abs(rot) > self._orient_tol:
                 duration = abs(rot) / ROTATION_SPEED
-                if duration > FINE_THRESH:
+                if self._do_fine and duration > FINE_THRESH:
                     command = RIGHT if rot > 0 else LEFT
                     return command, duration
                 command = RIGHT_FINE if rot > 0 else LEFT_FINE
@@ -244,7 +248,7 @@ class Waypoint:
         # Rotate first, then move.
         if abs(rot) > self._orient_tol:
             duration = abs(rot) / ROTATION_SPEED
-            if duration > FINE_THRESH:
+            if self._do_fine and duration > FINE_THRESH:
                 command = RIGHT if rot > 0 else LEFT
                 return command, duration
             command = RIGHT_FINE if rot > 0 else LEFT_FINE
@@ -252,7 +256,7 @@ class Waypoint:
         if abs(trans) > self._pos_tol:
             if rotation_only: return None, 0
             duration = abs(trans) / MOVEMENT_SPEED
-            if duration > FINE_THRESH:
+            if self._do_fine and duration > FINE_THRESH:
                 command = FORWARD if trans > 0 else BACKWARD
                 return command, duration
             command = FORWARD_FINE if trans > 0 else BACKWARD_FINE
