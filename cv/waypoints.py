@@ -202,7 +202,7 @@ class Waypoint:
                         if rotation_only: return None, 0
                         return BACKWARD, self._near_tol / MOVEMENT_SPEED
                     duration = abs(rot) / ROTATION_SPEED
-                    if self._do_fine and duration > FINE_THRESH:
+                    if not self._do_fine or duration > FINE_THRESH:
                         command = RIGHT if rot > 0 else LEFT
                         return command, duration
                     command = RIGHT_FINE if rot > 0 else LEFT_FINE
@@ -213,7 +213,7 @@ class Waypoint:
                 # Should now just head to the point.
                 trans = self._get_translation_align(centre, front)
                 duration = abs(trans) / MOVEMENT_SPEED
-                if self._do_fine and duration > FINE_THRESH:
+                if not self._do_fine or duration > FINE_THRESH:
                     command = FORWARD if trans > 0 else BACKWARD
                     return command, duration
                 command = FORWARD_FINE if trans > 0 else BACKWARD_FINE
@@ -223,7 +223,7 @@ class Waypoint:
             rot = self._get_rotation_align_target(centre, front)
             if abs(rot) > self._orient_tol:
                 duration = abs(rot) / ROTATION_SPEED
-                if self._do_fine and duration > FINE_THRESH:
+                if not self._do_fine or duration > FINE_THRESH:
                     command = RIGHT if rot > 0 else LEFT
                     return command, duration
                 command = RIGHT_FINE if rot > 0 else LEFT_FINE
@@ -248,7 +248,7 @@ class Waypoint:
         # Rotate first, then move.
         if abs(rot) > self._orient_tol:
             duration = abs(rot) / ROTATION_SPEED
-            if self._do_fine and duration > FINE_THRESH:
+            if not self._do_fine or duration > FINE_THRESH:
                 command = RIGHT if rot > 0 else LEFT
                 return command, duration
             command = RIGHT_FINE if rot > 0 else LEFT_FINE
@@ -256,7 +256,7 @@ class Waypoint:
         if abs(trans) > self._pos_tol:
             if rotation_only: return None, 0
             duration = abs(trans) / MOVEMENT_SPEED
-            if self._do_fine and duration > FINE_THRESH:
+            if not self._do_fine or duration > FINE_THRESH:
                 command = FORWARD if trans > 0 else BACKWARD
                 return command, duration
             command = FORWARD_FINE if trans > 0 else BACKWARD_FINE

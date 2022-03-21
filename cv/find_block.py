@@ -75,7 +75,7 @@ def find_block(image: np.ndarray, shift: np.ndarray, invmat: np.ndarray, angle_o
     _DEBUG and print(f"forward {forward}")
     # so forward now points in the direction that the robot should come from
     
-    return mid, forward
+    return np.array(mid), np.array(forward)
     
 def _test_rectangle_orientation():
     # A very basic example demonstrating orientation detection

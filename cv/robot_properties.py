@@ -73,8 +73,8 @@ GATE_DOWN = 45
 GATE_OFFSET = np.array((1.25,0))
 MIDDLE_OFFSET = np.array((0,0))
 
-SENSOR_OFFSET_DETECT = np.array((2.3,1))
-SENSOR_OFFSET_NO_DETECT = np.array((3.5,1))
+SENSOR_OFFSET_DETECT = np.array((2.3,0.7))
+SENSOR_OFFSET_NO_DETECT = np.array((3.5,0.7))
 
 # Purely for debugging purposes
 _BOT_SIZE = 2

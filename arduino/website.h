@@ -1,0 +1,4 @@
+// To make website C friendly, change all "" to '', and \ to \\. Also remove all newlines.
+// Then paste that below, surrounded by "".
+
+#define WEBSITE "<table style='text-align:center; font-size:xx-large'><tr><th>  <a href='/TRIGGER/-100/-255//3500//'>&lt;^</a>  </th><th>  <a  href='/TRIGGER/-255/-255//500//'>^</a>  </th><th>  <a  href='/TRIGGER/-255/-100//3500//'>^></a>  </th></tr><tr><td>  <a  href='/TRIGGER/100/-100//500//'>&lt;</a>  </td><td>  <a  href='/TRIGGER/0/0//500//'>Stop</a>  </td><td>  <a  href='/TRIGGER/-100/100//500//'>></a>  </td></tr><tr><td>  <a  href='/TRIGGER/100/255//3500//'>&lt;\\/</a>  </td><td>  <a  href='/TRIGGER/255/255//500//'>\\/</a>  </td><td>  <a  href='/TRIGGER/255/100//3500//'>\\/></a>  </td></tr></table><br><a  href='/TRIGGER/0/0/135/100//'>Open gate</a><br><a  href='/TRIGGER/0/0/45/100//'>Close gate</a><br><a  href='/TRIGGER/0/0//500/300/'>Detect above 300</a>"

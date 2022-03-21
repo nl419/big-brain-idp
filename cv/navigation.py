@@ -17,14 +17,15 @@ from find_dots import *
 import time
 import math
 from robot_properties import *
-ip = "http://192.168.137.187"
+ip = "http://192.168.137.251"
 
 SEND_COMMANDS = True # whether to attempt to send commands to the ip address
-MIN_COMMAND_INTERVAL = 1000 # in ms
+MIN_COMMAND_INTERVAL = 2000 # in ms
 DEBUG_WAYPOINTS = True
 IMPROVE_DROPOFF = True
 READ_SENSOR = True
-CHECK_STUCK = False
+CHECK_STUCK = False 
+WAIT_BLOCK_AFTER_CORNER = False
 
 TEST_CORNER = False # Whether to test the corner
 TEST_CORNER_BLUE = False # Whether the testing corner is blue
@@ -54,7 +55,7 @@ CALIBRATION_COMMANDS = (
 # How to parse the return from the Arduino
 SENSOR_DATA_TRIGGER = "TRIGGER/"
 END_SENSOR_DATA_TRIGGER = "/"
-SENSOR_DELTA_THRESH = 40
+SENSOR_DELTA_THRESH = 20
 STATIONARY_THRESH = 2
 STUCK_TIME_THRESH = 5000 # ms, maybe there was a huge lag spike
 
@@ -233,6 +234,7 @@ class Navigator:
     _block_blue: bool = False
     _last_reading: int = 0
     _srts_up_to_date: bool = False
+    _waiting_for_block: bool = False # TODO update this on picking up the block.
 
     # Robot locations
     _centre: np.ndarray = np.array((100,100)) # Dummy initial values
@@ -531,7 +533,6 @@ class Navigator:
         self._blue_dropoff_srts = [list(i) + [dropoff_srt] for i in b_d_srts]
         self._red_dropoff_srts = [list(i) + [dropoff_srt] for i in r_d_srts]
 
-
     def __init__(self, videostream_url: str):
         self._video = DotPatternVideo(videostream_url, 0.4, undo_parallax=False)
         frame, _,_,_ = self._video.find(annotate=False)
@@ -738,20 +739,55 @@ class Navigator:
                 # If all the blocks have been delivered, go home.
                 if self._blue_count == 2 and self._red_count == 2:
                     self._current_srts = [self._home_srt]
+                    self._force_go_home = True
                     return True
 
-                # Do the corner
-                if TEST_CORNER:
-                    corner_srts = self._blue_corner_srts[0] if TEST_CORNER_BLUE else self._red_corner_srts[0]
-                else: corner_srts = self._blue_corner_srts[0] if self._block_blue else self._red_corner_srts[0]
-                self._current_srts.extend(corner_srts)
-                if TEST_CORNER: return True
+                # Wait for a block, while sitting on the pickup cross
+                # Summary:
+                # Look for a block
+                # If you find one, wait a second, then look again.
+                # If it's still in the same place, pick it up.
+                if self._waiting_for_block: # Detect block while waiting at pickup cross
+                    b_c, _ = find_block(self._frame, self._shift, self._invmat)
+                    if b_c is not None and b_c[0] is not None:
+                        print("Found a block. Waiting...")
+                        time.sleep(1)
+                        self._frame, _, _, _ = self._video.find(shift=self._shift, invmat=self._invmat)
+                        b_c2, _ = find_block(self._frame, self._shift, self._invmat)
+                        if b_c2 is not None and b_c2[0] is not None and np.linalg.norm(b_c - b_c2) < 3:
+                            self._waiting_for_block = False
+                            print("Block confirmed.")
+                        else:
+                            print("Block moved. Aborting...")
+                            return False
+                else: 
+                    # Detect the block at dropoff of the previous block
+                    if not WAIT_BLOCK_AFTER_CORNER:
+                        b_c, _ = find_block(self._frame, self._shift, self._invmat)
+                        if b_c is None:
+                            if DEBUG_WAYPOINTS: b_c = np.array((300,600))
+                            else: return False
+                    # Do the corner
+                    if TEST_CORNER:
+                        corner_srts = self._blue_corner_srts[0] if TEST_CORNER_BLUE else self._red_corner_srts[0]
+                    else: corner_srts = self._blue_corner_srts[0] if self._block_blue else self._red_corner_srts[0]
+                    self._current_srts.extend(corner_srts)
+                    if TEST_CORNER: return True
+                    
+                    # If we should go to pickup cross and then wait for a block,
+                    if WAIT_BLOCK_AFTER_CORNER:
+                        self._waiting_for_block = True
+                        self._current_srts.append(Subroutine(
+                            [
+                                Waypoint(untransform_board(self._shift, self._invmat, PICKUP_CROSS_T), 
+                                        pos_tol=40, do_fine=False
+                                )
+                            ]
+                        ))
+                        return True
 
-                # Make a route to pickup a block
-                b_c, _ = find_block(self._frame, self._shift, self._invmat)
-                if b_c is None:
-                    if DEBUG_WAYPOINTS: b_c = np.array((300,600))
-                    else: return False
+                # If we got here, we're not waiting for a block, we have one.
+
                 b_c = undo_parallax(b_c, BLOCK_HEIGHT)
                 # Check if the block is near the wall
                 b_c_T = transform_board(self._shift, self._mat, b_c)
@@ -896,7 +932,8 @@ class Navigator:
 
         if not self._run_srts():
             # reached end of srts
-            self._got_block = not self._got_block
+            if not self._waiting_for_block:
+                self._got_block = not self._got_block
             self._srts_up_to_date = False
             self._srts_up_to_date = self._update_state(reuse_frame=True) # Get next waypoints
             # If srts couldn't be calculated, wait until next frame

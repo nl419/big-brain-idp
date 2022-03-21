@@ -536,6 +536,6 @@ class DotPatternVideo:
 
 if _DEBUG:
     # _test_transform()
-    # _test_video()
+    _test_video()
     # _test_image()
-    _test_calibrate_parallax()
+    # _test_calibrate_parallax()
